@@ -1,11 +1,8 @@
 // transaction handlers
-// const txHandlerName = require('./tx-handler-name/tx-handler-name');
-
-// block handlers
-// const blockHandlerName = require('./block-handler-name/block-handler-name');
+const addressWatch = require('./address-watch/address-watch');
 
 const txHandlers = [
-  // txHandlerName,
+  addressWatch,
 ];
 
 const blockHandlers = [
