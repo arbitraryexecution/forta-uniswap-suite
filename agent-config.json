@@ -1,3 +1,9 @@
 {
-  "UNISWAP_V3_EVEREST_ID": "0xa2e07f422b5d7cbbfca764e53b251484ecf945fa"
+  "UNISWAP_V3_EVEREST_ID": "0xa2e07f422b5d7cbbfca764e53b251484ecf945fa",
+  "poolInformation": {
+    "startBlock": 12369739
+  },
+  "largeFlashSwap": {
+    "thresholdUSDC": 1000000
+  }
 }

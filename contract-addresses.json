@@ -1,6 +1,18 @@
 {
-  "UniswapV3Factory": "0x1F98431c8aD98523631AE4a59f267346ea31F984",
-  "GovernorBravo": "0x408ED6354d4973f66138C91495F2f2FCbd8724C3",
-  "Uni": "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
-  "Timelock": "0x1a9C8182C09F50C8318d769245beA52c32BE35BC"
+  "UniswapV3Factory": {
+    "address": "0x1F98431c8aD98523631AE4a59f267346ea31F984",
+    "abiName": "UniswapV3Factory"
+  },
+  "GovernorBravo": {
+    "address": "0x408ED6354d4973f66138C91495F2f2FCbd8724C3",
+    "abiName": "GovernorBravo"
+  },
+  "Uni": {
+    "address": "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
+    "abiName": "Uni"
+  },
+  "Timelock": {
+    "address": "0x1a9C8182C09F50C8318d769245beA52c32BE35BC",
+    "abiName": "Timelock"
+  }
 }
