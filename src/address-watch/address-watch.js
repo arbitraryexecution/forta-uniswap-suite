@@ -116,14 +116,14 @@ function provideHandleTransaction(data) {
 
     if (!contracts) throw new Error('handleTransaction called before initialization');
 
-    // check if this tx changed any of the governors
+    // check if this tx changed any of the admins
     contracts.forEach((contract) => {
       const parsedLogs = filterAndParseLogs(txEvent.logs, contract.address, contract.interface,
-        ['MinterChanged', 'NewAdmin', 'OwnerChanged']);
+        ['MinterChanged', 'NewAdmin', 'OwnerChanged', 'OwnershipTransferred', 'AdminChanged']);
       data.check = data.check || (parsedLogs.length > 0);
     });
 
-    if (data.check) { // there was a governor change, pull current governor addresses
+    if (data.check) { // there was an admin change, pull current admin addresses
       data.addresses = [];
 
       // iterate over each contract name to get the key addresses
