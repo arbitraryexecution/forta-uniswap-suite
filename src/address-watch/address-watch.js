@@ -118,7 +118,7 @@ function provideHandleTransaction(data) {
 
     // check if this tx changed any of the governors
     contracts.forEach((contract) => {
-      const parsedLogs = filterAndParseLogs(txEvent.logs, contract.address, contract.interface, 
+      const parsedLogs = filterAndParseLogs(txEvent.logs, contract.address, contract.interface,
         ['MinterChanged', 'NewAdmin', 'OwnerChanged']);
       data.check = data.check || (parsedLogs.length > 0);
     });
