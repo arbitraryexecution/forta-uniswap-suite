@@ -62,7 +62,7 @@ function provideHandleTransaction(data) {
     );
     if (poolCreated.length > 0) {
       poolCreated.forEach((poolCreatedEvent) => {
-        const { eventData, topics } = poolCreatedEvent;
+        const { data: eventData, topics } = poolCreatedEvent;
         const {
           args: {
             token0,
@@ -71,7 +71,7 @@ function provideHandleTransaction(data) {
             tickSpacing,
             pool: newPoolAddress,
           },
-        } = factoryContract.interface.parseLog({ eventData, topics });
+        } = factoryContract.interface.parseLog({ data: eventData, topics });
 
         // add the pool information
         const finding = Finding.fromObject({
@@ -100,21 +100,20 @@ function provideHandleTransaction(data) {
 
     if (flashSwaps.length > 0) {
       const flashSwapPromises = flashSwaps.map(async (flashSwapEvent) => {
-        const { address, eventData, topics } = flashSwapEvent;
+        const { address, data: eventData, topics } = flashSwapEvent;
 
         if ((Object.keys(poolInformation)).indexOf(address) === -1) {
           return undefined;
         }
 
         const poolContract = new ethers.Contract(address, poolAbi, provider);
-
         const {
           args: {
             sender,
             amount0,
             amount1,
           },
-        } = poolContract.interface.parseLog({ eventData, topics });
+        } = poolContract.interface.parseLog({ data: eventData, topics });
 
         const flashSwapInfo = {
           address,
