@@ -29,6 +29,9 @@
        "ProposalThresholdSet": { "type": "Info", "severity": "Info" },
        "VotingDelaySet":  { "type": "Info", "severity": "Info" },
        "VotingPeriodSet": { "type": "Info", "severity": "Info" }
+    },
+    "Uni": {
+      "MinterChanged": { "type": "Suspicioius", "severity": "High" }
     }
   }
 }
