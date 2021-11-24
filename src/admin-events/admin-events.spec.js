@@ -58,11 +58,12 @@ describe('admin event monitoring', () => {
 
       // retrieve the Object corresponding to the SafeBoxETH contract
       const governorBravoContract = getContractByName(contracts, 'GovernorBravo');
+      const governorBravoAddress = governorBravoContract.address.toLowerCase();
 
       // logs data for test case: address match + no topic match
       const logsNoMatchEvent = [
         {
-          address: governorBravoContract.address,
+          address: governorBravoAddress,
           topics: [
             governorBravoContract.iface.getEventTopic('VoteCast'),
             ethers.constants.HashZero, // voter address
@@ -75,7 +76,7 @@ describe('admin event monitoring', () => {
       // build transaction event
       const txEvent = createTransactionEvent({
         receipt: { logs: logsNoMatchEvent },
-        addresses: { [governorBravoContract.address]: true },
+        addresses: { [governorBravoAddress]: true },
       });
 
       // run agent
@@ -90,25 +91,25 @@ describe('admin event monitoring', () => {
 
       // retrieve the Object corresponding to the UniswapV3Factory contract
       const uniswapV3FactoryContract = getContractByName(contracts, 'UniswapV3Factory');
+      const uniswapV3FactoryAddress = uniswapV3FactoryContract.address.toLowerCase();
 
       // logs data for test case: address match + topic match (should trigger a finding)
       const logsMatchEvent = [
         {
-          address: uniswapV3FactoryContract.address.toLowerCase(),
+          address: uniswapV3FactoryAddress,
           topics: [
             uniswapV3FactoryContract.iface.getEventTopic('OwnerChanged'),
             `${(ethers.constants.HashZero).slice(0, -1)}1`, // old owner address  0x0000...0001
             `${(ethers.constants.HashZero).slice(0, -1)}2`, // new owner address  0x0000...0002
           ],
-          // create a large dummy array to give ethers.parselog() something to decode
-          data: `0x${'0'.repeat(1000)}`,
+          data: '0x',
         },
       ];
 
       // build transaction event
       const txEvent = createTransactionEvent({
         receipt: { logs: logsMatchEvent },
-        addresses: { [uniswapV3FactoryContract.address]: true },
+        addresses: { [uniswapV3FactoryAddress]: true },
       });
 
       // run agent
