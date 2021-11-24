@@ -1,3 +1,32 @@
 {
-  "UNISWAP_V3_EVEREST_ID": "0xa2e07f422b5d7cbbfca764e53b251484ecf945fa"
+  "EVEREST_ID": "0xa2e07f422b5d7cbbfca764e53b251484ecf945fa",
+  "PROTOCOL_NAME": "Uniswap V3",
+  "PROTOCOL_ABBREVIATION": "UNISWAPV3",
+  "adminEvents": {
+    "UniswapV3Factory": {
+      "PoolCreated": { "type": "Info", "severity": "Info" },
+      "OwnerChanged": { "type": "Suspicious", "severity": "High" },
+      "FeeAmountEnabled": { "type": "Info", "severity": "Info" }
+    },
+    "ProxyAdmin": {
+      "AdminChanged": { "type": "Suspicious", "severity": "High" },
+      "OwnershipChanged" : { "type": "Suspicious", "severity": "High" }
+    },
+    "NonfungibleTokenPositionDescriptor": {
+      "UpdateTokenRatioPriority": { "type": "Info", "severity": "Info" }
+    },
+    "TransparentUpgradableProxy": {
+      "AdminChanged": { "type": "Suspicious", "severity": "High" },
+      "Upgraded" : { "type": "Suspicious", "severity": "High" }
+
+    },
+    "NonfungiblePositionManager": {
+       "Approval": { "type": "Info", "severity": "Info" },
+       "ApprovalForAll": { "type": "Info", "severity": "Info" },
+       "IncreaseLiquidity": { "type": "Info", "severity": "Info" },
+       "DecreaseLiquidity": { "type": "Info", "severity": "Info" },
+       "Collect": { "type": "Info", "severity": "Info" },
+       "Transfer": { "type": "Info", "severity": "Info" }
+    }
+  }
 }
