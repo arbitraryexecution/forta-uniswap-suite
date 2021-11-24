@@ -25,7 +25,10 @@
        "NewImplementation": { "type": "Suspicious", "severity": "Medium" },
        "ProposalCreated": { "type": "Info", "severity": "Info" },
        "ProposalExecuted": { "type": "Info", "severity": "Info" },
-       "ProposalCanceled": { "type": "Info", "severity": "Info" }
+       "ProposalCanceled": { "type": "Info", "severity": "Info" },
+       "ProposalThresholdSet": { "type": "Info", "severity": "Info" },
+       "VotingDelaySet":  { "type": "Info", "severity": "Info" },
+       "VotingPeriodSet": { "type": "Info", "severity": "Info" }
     }
   }
 }

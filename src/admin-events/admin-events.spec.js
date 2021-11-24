@@ -53,6 +53,38 @@ describe('admin event monitoring', () => {
       expect(findings).toStrictEqual([]);
     });
 
+    it('returns empty findings if contract address matches but not event', async () => {
+      const { contracts } = initializeData;
+
+      // retrieve the Object corresponding to the SafeBoxETH contract
+      const governorBravoContract = getContractByName(contracts, 'GovernorBravo');
+
+      // logs data for test case: address match + no topic match
+      const logsNoMatchEvent = [
+        {
+          address: governorBravoContract.address,
+          topics: [
+            governorBravoContract.iface.getEventTopic('VoteCast'),
+            ethers.constants.HashZero, // voter address
+          ],
+          // create a large dummy array to give ethers.parseLog() something to decode
+          data: `0x${'0'.repeat(1000)}`,
+        },
+      ];
+
+      // build transaction event
+      const txEvent = createTransactionEvent({
+        receipt: { logs: logsNoMatchEvent },
+        addresses: { [governorBravoContract.address]: true },
+      });
+
+      // run agent
+      const findings = await handleTransaction(txEvent);
+
+      // assertions
+      expect(findings).toStrictEqual([]);
+    });
+
     it('returns a finding if a target contract emits an event from its watchlist', async () => {
       const { contracts } = initializeData;
 
