@@ -58,6 +58,33 @@ function createAlert(
   });
 }
 
+// helper function to update the key protocol addresses
+async function getKeyAddresses(data){
+    // iterate over each contract name to get the key addresses
+    const addresses = await Promise.all(data.contracts.map(async (contract) => {
+        /* eslint-disable no-prototype-builtins */
+        let address;
+        if (contract.hasOwnProperty('minter')) {
+          // get the minter address for a contract that has it
+          address = await contract.minter();
+        } else if (contract.hasOwnProperty('owner')) {
+          // get the owner address for a contract that has it
+          address = await contract.owner();
+        } else if (contract.hasOwnProperty('admin')) {
+          // get the admin address for a contract that has it
+          address = await contract.admin();
+        }
+        if (address) {
+          return address.toLowerCase();
+        }
+        return address;
+        /* eslint-enable no-prototype-builtins */
+    }));
+  
+    // filter out undefined entries and then remove duplicates
+    return [...new Set(addresses.filter((address) => address !== undefined))];
+}
+
 function provideInitialize(data) {
   return async function initialize() {
     /* eslint-disable no-param-reassign */
@@ -69,9 +96,6 @@ function provideInitialize(data) {
     // initialize a provider object to set up callable contract objects
     const provider = new ethers.providers.JsonRpcProvider(getJsonRpcUrl());
 
-    // store key protocol addresses, this could change block to block
-    data.addresses = [];
-
     // store contracts as callable ethers Contract objects
     data.contracts = [];
     Object.keys(contractAddresses).forEach((contract) => {
@@ -80,29 +104,7 @@ function provideInitialize(data) {
       data.contracts.push(new ethers.Contract(addr, abi, provider));
     });
 
-    // iterate over each contract name to get the key addresses
-    const addresses = await Promise.all(data.contracts.map(async (contract) => {
-      /* eslint-disable no-prototype-builtins */
-      let address;
-      if (contract.hasOwnProperty('minter')) {
-        // get the minter address for a contract that has it
-        address = await contract.minter();
-      } else if (contract.hasOwnProperty('owner')) {
-        // get the owner address for a contract that has it
-        address = await contract.owner();
-      } else if (contract.hasOwnProperty('admin')) {
-        // get the admin address for a contract that has it
-        address = await contract.admin();
-      }
-      if (address) {
-        return address.toLowerCase();
-      }
-      return address;
-      /* eslint-enable no-prototype-builtins */
-    }));
-
-    // filter out undefined entries and then remove duplicates
-    data.addresses = [...new Set(addresses.filter((address) => address !== undefined))];
+    data.addresses = await getKeyAddresses(data);
 
     // no need to check again until there is a change event
     data.check = false;
@@ -127,32 +129,7 @@ function provideHandleTransaction(data) {
     });
 
     if (data.check) { // there was an admin change, pull current admin addresses
-      data.addresses = [];
-
-      // iterate over each contract name to get the key addresses
-      const addresses = await Promise.all(data.contracts.map(async (contract) => {
-        /* eslint-disable no-prototype-builtins */
-        let address;
-        if (contract.hasOwnProperty('minter')) {
-          // get the minter address for a contract that has it
-          address = await contract.minter();
-        } else if (contract.hasOwnProperty('owner')) {
-          // get the owner address for a contract that has it
-          address = await contract.owner();
-        } else if (contract.hasOwnProperty('admin')) {
-          // get the admin address for a contract that has it
-          address = await contract.admin();
-        }
-        if (address) {
-          return address.toLowerCase();
-        }
-        return address;
-        /* eslint-enable no-prototype-builtins */
-      }));
-
-      // filter out undefined entries and then remove duplicates
-      data.addresses = [...new Set(addresses.filter((address) => address !== undefined))];
-
+      data.addresses = await getKeyAddresses(data);
       data.check = false;
       /* eslint-enable no-param-reassign */
     }
