@@ -86,13 +86,13 @@ describe('key protocol address watch handler', () => {
       // assertions
       expect(findings).toStrictEqual([
         Finding.fromObject({
-          name: 'Uniswap Address Watch Notification',
+          name: 'Uniswap V3 Address Watch Notification',
           description: 'Key protocol address involved in a transaction',
-          alertId: 'AE-UNISWAP-ADDRESS-WATCH-INFO',
+          alertId: 'AE-UNISWAPV3-ADDRESS-WATCH',
           type: FindingType.Info,
           severity: FindingSeverity.Info,
           everestId: initializeData.everestId,
-          protocol: 'Uniswap',
+          protocol: 'Uniswap V3',
           metadata: {
             address: testAddr,
             tx: ethers.constants.HashZero,
@@ -162,13 +162,13 @@ describe('key protocol address watch handler', () => {
       // assertions
       expect(findings).toStrictEqual([
         Finding.fromObject({
-          name: 'Uniswap Address Watch Notification',
+          name: 'Uniswap V3 Address Watch Notification',
           description: 'Key protocol address involved in a transaction',
-          alertId: 'AE-UNISWAP-ADDRESS-WATCH-INFO',
+          alertId: 'AE-UNISWAPV3-ADDRESS-WATCH',
           type: FindingType.Info,
           severity: FindingSeverity.Info,
           everestId: initializeData.everestId,
-          protocol: 'Uniswap',
+          protocol: 'Uniswap V3',
           metadata: {
             address: testAddr2,
             tx: ethers.constants.HashZero,

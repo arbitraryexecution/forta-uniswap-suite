@@ -1,4 +1,3 @@
-// can test this agent on tx 0x74245e831640e09dd60cddeeea25d726a65eabb80b5896441ae4e68e646c6eb9
 const ethers = require('ethers');
 const {
   Finding, FindingSeverity, FindingType, getJsonRpcUrl,
@@ -41,15 +40,17 @@ function createAlert(
   address,
   tx,
   everestId,
+  protocolName,
+  protocolAbbreviation
 ) {
   return Finding.fromObject({
-    name: 'Uniswap Address Watch Notification',
+    name: `${protocolName} Address Watch Notification`,
     description: 'Key protocol address involved in a transaction',
-    alertId: 'AE-UNISWAP-ADDRESS-WATCH-INFO',
+    alertId: `AE-${protocolAbbreviation}-ADDRESS-WATCH`,
     type: FindingType.Info,
     severity: FindingSeverity.Info,
     everestId,
-    protocol: 'Uniswap',
+    protocol: `${protocolName}`,
     metadata: {
       address,
       tx,
@@ -61,7 +62,9 @@ function provideInitialize(data) {
   return async function initialize() {
     /* eslint-disable no-param-reassign */
     // assign configurable fields
-    data.everestId = config.UNISWAP_V3_EVEREST_ID;
+    data.everestId = config.EVEREST_ID;
+    data.protocolName = config.PROTOCOL_NAME;
+    data.protocolAbbreviation = config.PROTOCOL_ABBREVIATION;
 
     // initialize a provider object to set up callable contract objects
     const provider = new ethers.providers.JsonRpcProvider(getJsonRpcUrl());
@@ -111,7 +114,7 @@ function provideHandleTransaction(data) {
   return async function handleTransaction(txEvent) {
     /* eslint-disable no-param-reassign */
     const {
-      contracts, everestId,
+      contracts, everestId, protocolName, protocolAbbreviation
     } = data;
 
     if (!contracts) throw new Error('handleTransaction called before initialization');
@@ -165,6 +168,8 @@ function provideHandleTransaction(data) {
           address,
           txEvent.hash,
           everestId,
+          protocolName,
+          protocolAbbreviation
         ));
       }
     });
