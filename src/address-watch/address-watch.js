@@ -8,6 +8,9 @@ const config = require('../../agent-config.json');
 
 // load contract and oracle addresses
 const contractAddresses = require('../../contract-addresses.json');
+const addressList = Object.values(contractAddresses).map((address) => {
+    return address.toLowerCase();
+});
 
 // set up a variable to hold initialization data used in the handler
 const initializeData = {};
@@ -41,14 +44,23 @@ function createAlert(
   tx,
   everestId,
   protocolName,
-  protocolAbbreviation
+  protocolAbbreviation,
+  lowSeverity
 ) {
+  let type, severity;
+  if(lowSeverity){
+    type = FindingType.Info;
+    severity = FindingSeverity.Info;
+  } else {
+    type = FindingType.Suspicious;
+    severity = FindingSeverity.Medium;
+  }
   return Finding.fromObject({
     name: `${protocolName} Address Watch Notification`,
     description: 'Key protocol address involved in a transaction',
     alertId: `AE-${protocolAbbreviation}-ADDRESS-WATCH`,
-    type: FindingType.Info,
-    severity: FindingSeverity.Info,
+    type: type,
+    severity: severity,
     everestId,
     protocol: `${protocolName}`,
     metadata: {
@@ -141,12 +153,15 @@ function provideHandleTransaction(data) {
 
     data.addresses.forEach((address) => {
       if (txAddrs.includes(address)) {
+        // if interacting with a known protocol contract, set low severity alert
+        const lowSeverity = addressList.includes(txEvent.to.toLowerCase()) || addressList.includes(txEvent.from.toLowerCase());
         findings.push(createAlert(
           address,
           txEvent.hash,
           everestId,
           protocolName,
-          protocolAbbreviation
+          protocolAbbreviation,
+          lowSeverity
         ));
       }
     });
