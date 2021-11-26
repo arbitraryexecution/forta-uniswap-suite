@@ -4,6 +4,7 @@ const {
 } = require('forta-agent');
 
 const { provideHandleTransaction, provideInitialize, getAbi } = require('./address-watch');
+const { Uni: uniAddress } = require('../../contract-addresses.json');
 
 const testAddr = `0x1${'0'.repeat(39)}`;
 const testAddr2 = `0x2${'0'.repeat(39)}`;
@@ -47,6 +48,7 @@ describe('key protocol address watch handler', () => {
         addresses,
         transaction: {
           hash: ethers.constants.HashZero,
+          to: uniAddress
         },
         receipt: { logs: logsNoMatchEvent },
       });
@@ -76,6 +78,7 @@ describe('key protocol address watch handler', () => {
         addresses,
         transaction: {
           hash: ethers.constants.HashZero,
+          to: uniAddress
         },
         receipt: { logs: logsNoMatchEvent },
       });
@@ -118,9 +121,13 @@ describe('key protocol address watch handler', () => {
       ];
 
       const txEvent = createTransactionEvent({
+        transaction: {
+            to: uniAddress
+        },
         addresses,
         transaction: {
           hash: ethers.constants.HashZero,
+          to: uniAddress
         },
         receipt: { logs: logsEventMatch },
       });
@@ -152,6 +159,7 @@ describe('key protocol address watch handler', () => {
         addresses,
         transaction: {
           hash: ethers.constants.HashZero,
+          to: uniAddress
         },
         receipt: { logs: logsEventMatch },
       });
