@@ -48,7 +48,7 @@ describe('key protocol address watch handler', () => {
         addresses,
         transaction: {
           hash: ethers.constants.HashZero,
-          to: uniAddress
+          to: uniAddress,
         },
         receipt: { logs: logsNoMatchEvent },
       });
@@ -78,7 +78,7 @@ describe('key protocol address watch handler', () => {
         addresses,
         transaction: {
           hash: ethers.constants.HashZero,
-          to: uniAddress
+          to: uniAddress,
         },
         receipt: { logs: logsNoMatchEvent },
       });
@@ -121,13 +121,10 @@ describe('key protocol address watch handler', () => {
       ];
 
       const txEvent = createTransactionEvent({
-        transaction: {
-            to: uniAddress
-        },
         addresses,
         transaction: {
           hash: ethers.constants.HashZero,
-          to: uniAddress
+          to: uniAddress,
         },
         receipt: { logs: logsEventMatch },
       });
@@ -159,7 +156,7 @@ describe('key protocol address watch handler', () => {
         addresses,
         transaction: {
           hash: ethers.constants.HashZero,
-          to: uniAddress
+          to: uniAddress,
         },
         receipt: { logs: logsEventMatch },
       });

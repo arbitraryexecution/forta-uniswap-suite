@@ -8,9 +8,8 @@ const config = require('../../agent-config.json');
 
 // load contract and oracle addresses
 const contractAddresses = require('../../contract-addresses.json');
-const addressList = Object.values(contractAddresses).map((address) => {
-    return address.toLowerCase();
-});
+
+const addressList = Object.values(contractAddresses).map((address) => address.toLowerCase());
 
 // set up a variable to hold initialization data used in the handler
 const initializeData = {};
@@ -45,10 +44,11 @@ function createAlert(
   everestId,
   protocolName,
   protocolAbbreviation,
-  lowSeverity
+  lowSeverity,
 ) {
-  let type, severity;
-  if(lowSeverity){
+  let type; let
+    severity;
+  if (lowSeverity) {
     type = FindingType.Info;
     severity = FindingSeverity.Info;
   } else {
@@ -59,8 +59,8 @@ function createAlert(
     name: `${protocolName} Address Watch Notification`,
     description: 'Key protocol address involved in a transaction',
     alertId: `AE-${protocolAbbreviation}-ADDRESS-WATCH`,
-    type: type,
-    severity: severity,
+    type,
+    severity,
     everestId,
     protocol: `${protocolName}`,
     metadata: {
@@ -71,30 +71,30 @@ function createAlert(
 }
 
 // helper function to update the key protocol addresses
-async function getKeyAddresses(data){
-    // iterate over each contract name to get the key addresses
-    const addresses = await Promise.all(data.contracts.map(async (contract) => {
-        /* eslint-disable no-prototype-builtins */
-        let address;
-        if (contract.hasOwnProperty('minter')) {
-          // get the minter address for a contract that has it
-          address = await contract.minter();
-        } else if (contract.hasOwnProperty('owner')) {
-          // get the owner address for a contract that has it
-          address = await contract.owner();
-        } else if (contract.hasOwnProperty('admin')) {
-          // get the admin address for a contract that has it
-          address = await contract.admin();
-        }
-        if (address) {
-          return address.toLowerCase();
-        }
-        return address;
-        /* eslint-enable no-prototype-builtins */
-    }));
-  
-    // filter out undefined entries and then remove duplicates
-    return [...new Set(addresses.filter((address) => address !== undefined))];
+async function getKeyAddresses(data) {
+  // iterate over each contract name to get the key addresses
+  const addresses = await Promise.all(data.contracts.map(async (contract) => {
+    /* eslint-disable no-prototype-builtins */
+    let address;
+    if (contract.hasOwnProperty('minter')) {
+      // get the minter address for a contract that has it
+      address = await contract.minter();
+    } else if (contract.hasOwnProperty('owner')) {
+      // get the owner address for a contract that has it
+      address = await contract.owner();
+    } else if (contract.hasOwnProperty('admin')) {
+      // get the admin address for a contract that has it
+      address = await contract.admin();
+    }
+    if (address) {
+      return address.toLowerCase();
+    }
+    return address;
+    /* eslint-enable no-prototype-builtins */
+  }));
+
+  // filter out undefined entries and then remove duplicates
+  return [...new Set(addresses.filter((address) => address !== undefined))];
 }
 
 function provideInitialize(data) {
@@ -128,7 +128,7 @@ function provideHandleTransaction(data) {
   return async function handleTransaction(txEvent) {
     /* eslint-disable no-param-reassign */
     const {
-      contracts, everestId, protocolName, protocolAbbreviation
+      contracts, everestId, protocolName, protocolAbbreviation,
     } = data;
 
     if (!contracts) throw new Error('handleTransaction called before initialization');
@@ -154,14 +154,15 @@ function provideHandleTransaction(data) {
     data.addresses.forEach((address) => {
       if (txAddrs.includes(address)) {
         // if interacting with a known protocol contract, set low severity alert
-        const lowSeverity = addressList.includes(txEvent.to.toLowerCase()) || addressList.includes(txEvent.from.toLowerCase());
+        const lowSeverity = addressList.includes(txEvent.to.toLowerCase())
+            || addressList.includes(txEvent.from.toLowerCase());
         findings.push(createAlert(
           address,
           txEvent.hash,
           everestId,
           protocolName,
           protocolAbbreviation,
-          lowSeverity
+          lowSeverity,
         ));
       }
     });
