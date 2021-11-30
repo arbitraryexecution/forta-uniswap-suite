@@ -4,32 +4,64 @@
 const ethers = require('ethers');
 
 const {
-  Finding, FindingType, FindingSeverity,
+  Finding, FindingType, FindingSeverity, getJsonRpcUrl,
 } = require('forta-agent');
 
 // load any agent configuration parameters
 const config = require('../../agent-config.json');
 
 const utils = require('../utils');
-const common = require('../common');
+const common = require('./common');
 
 const FLASH_SIGNATURE = 'Flash(address,address,uint256,uint256,uint256,uint256)';
 
 // set up a variable to hold initialization data used in the handler
 const initializeData = {};
 
+async function updatePoolInformation(blockNumber, data) {
+  // if the pools have not been updated once since the initialize() function was called, update
+  // them now
+  if (blockNumber > data.latestBlock + 1) {
+    data.latestBlock = await common.getPoolInformation(
+      data.provider,
+      data.factoryContract,
+      data.latestBlock + 1,
+      blockNumber - 1,
+      data.poolInformation,
+    );
+  }
+
+  // determine the conversion from each token to USDC
+  common.createConversionGraph(data.poolInformation);
+
+  // set the variable so this code does not run again
+  data.upToDate = true;
+}
+
 function provideInitialize(data) {
   return async function initialize() {
     /* eslint-disable no-param-reassign */
 
+    // get all of the data for the Uniswap V3 pools
+    data.latestBlock = await common.latestBlockPromise;
+
     data.everestId = config.UNISWAP_V3_EVEREST_ID;
 
-    data.flashSwapThresholdUSDC = ethers.BigNumber.from(config.largeFlashSwap.thresholdUSDC);
+    data.provider = new ethers.providers.JsonRpcBatchProvider(getJsonRpcUrl());
+    data.factoryContract = utils.getContract('UniswapV3Factory', data.provider);
 
-    data.provider = common.provider;
-    data.poolInformation = common.poolInformation;
-    data.factoryContract = common.factoryContract;
     data.POOL_CREATED_SIGNATURE = common.POOL_CREATED_SIGNATURE;
+
+    data.poolInformation = {};
+    await common.getPoolInformation(
+      data.provider,
+      data.factoryContract,
+      config.poolInformation.startBlock,
+      'latest',
+      data.poolInformation,
+    );
+
+    data.flashSwapThresholdUSDC = ethers.BigNumber.from(config.largeFlashSwap.thresholdUSDC);
 
     data.poolAbi = utils.getAbi('UniswapV3Pool');
 
@@ -41,6 +73,10 @@ function provideInitialize(data) {
 
 function provideHandleTransaction(data) {
   return async function handleTransaction(txEvent) {
+    if (data.upToDate === false) {
+      await updatePoolInformation(txEvent.blockNumber, data);
+    }
+
     const {
       poolAbi,
       provider,

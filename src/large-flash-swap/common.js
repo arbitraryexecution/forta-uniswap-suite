@@ -2,16 +2,12 @@ const ethers = require('ethers');
 
 const { getJsonRpcUrl } = require('forta-agent');
 
-const utils = require('./utils');
+const utils = require('../utils');
 
-const config = require('../agent-config.json');
+const config = require('../../agent-config.json');
 
 const POOL_CREATED_SIGNATURE = 'PoolCreated(address,address,uint24,int24,address)';
 const USDC_ADDRESS = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48';
-
-const poolInfo = {};
-const jsonRpcProvider = new ethers.providers.JsonRpcBatchProvider(getJsonRpcUrl());
-const uniswapV3FactoryContract = utils.getContract('UniswapV3Factory', jsonRpcProvider);
 
 async function getPoolInformation(provider, factoryContract, fromBlock, toBlock, poolInformation) {
   // from the infura documentation, ref: https://infura.io/docs/ethereum/json-rpc/eth-getLogs
@@ -156,16 +152,6 @@ function createConversionGraph(poolInformation) {
 
 module.exports = {
   getPoolInformation,
-  provider: jsonRpcProvider,
-  factoryContract: uniswapV3FactoryContract,
-  latestBlockPromise: getPoolInformation(
-    jsonRpcProvider,
-    uniswapV3FactoryContract,
-    config.poolInformation.startBlock,
-    'latest',
-    poolInfo,
-  ),
   createConversionGraph,
-  poolInformation: poolInfo,
   POOL_CREATED_SIGNATURE,
 };
