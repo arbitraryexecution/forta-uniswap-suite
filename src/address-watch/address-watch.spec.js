@@ -97,9 +97,7 @@ describe('key protocol address watch handler', () => {
           everestId: initializeData.everestId,
           protocol: 'Uniswap V3',
           metadata: {
-            address: testAddr,
-            tx: ethers.constants.HashZero,
-          },
+            address: testAddr          },
         }),
       ]);
     });
@@ -175,8 +173,7 @@ describe('key protocol address watch handler', () => {
           everestId: initializeData.everestId,
           protocol: 'Uniswap V3',
           metadata: {
-            address: testAddr2,
-            tx: ethers.constants.HashZero,
+            address: testAddr2
           },
         }),
       ]);

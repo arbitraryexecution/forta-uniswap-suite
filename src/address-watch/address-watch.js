@@ -40,7 +40,6 @@ function filterAndParseLogs(logs, address, iface, eventNames) {
 // helper function to create alerts
 function createAlert(
   address,
-  tx,
   everestId,
   protocolName,
   protocolAbbreviation,
@@ -64,8 +63,7 @@ function createAlert(
     everestId,
     protocol: `${protocolName}`,
     metadata: {
-      address,
-      tx,
+      address
     },
   });
 }
@@ -135,7 +133,7 @@ function provideHandleTransaction(data) {
 
     // check if this tx changed any of the admins
     contracts.forEach((contract) => {
-      const parsedLogs = filterAndParseLogs(txEvent.logs, contract.address, contract.interface,
+      const parsedLogs = filterAndParseLogs(txEvent.logs, contract.address.toLowerCase(), contract.interface,
         ['MinterChanged', 'NewAdmin', 'OwnerChanged', 'OwnershipTransferred', 'AdminChanged']);
       data.check = data.check || (parsedLogs.length > 0);
     });
@@ -158,7 +156,6 @@ function provideHandleTransaction(data) {
             || addressList.includes(txEvent.from.toLowerCase());
         findings.push(createAlert(
           address,
-          txEvent.hash,
           everestId,
           protocolName,
           protocolAbbreviation,
