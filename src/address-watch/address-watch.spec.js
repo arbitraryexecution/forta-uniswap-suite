@@ -4,7 +4,9 @@ const {
 } = require('forta-agent');
 
 const { provideHandleTransaction, provideInitialize, getAbi } = require('./address-watch');
-const { Uni: uniAddress } = require('../../contract-addresses.json');
+const { Uni } = require('../../contract-addresses.json');
+
+const uniAddress = Uni.address;
 
 const testAddr = `0x1${'0'.repeat(39)}`;
 const testAddr2 = `0x2${'0'.repeat(39)}`;
@@ -96,8 +98,7 @@ describe('key protocol address watch handler', () => {
           severity: FindingSeverity.Info,
           everestId: initializeData.everestId,
           protocol: 'Uniswap V3',
-          metadata: {
-            address: testAddr          },
+          metadata: { address: testAddr },
         }),
       ]);
     });
@@ -173,7 +174,7 @@ describe('key protocol address watch handler', () => {
           everestId: initializeData.everestId,
           protocol: 'Uniswap V3',
           metadata: {
-            address: testAddr2
+            address: testAddr2,
           },
         }),
       ]);

@@ -91,4 +91,8 @@
 		"stateMutability": "view",
 		"type": "function"
 	}]
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> main

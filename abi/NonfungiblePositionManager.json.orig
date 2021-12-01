@@ -946,4 +946,8 @@
 		"stateMutability": "payable",
 		"type": "receive"
 	}]
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> main

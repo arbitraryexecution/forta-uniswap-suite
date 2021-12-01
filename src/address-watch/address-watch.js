@@ -2,6 +2,7 @@ const ethers = require('ethers');
 const {
   Finding, FindingSeverity, FindingType, getJsonRpcUrl,
 } = require('forta-agent');
+const { getAbi, filterAndParseLogs } = require('../common');
 
 // load any agent configuration parameters
 const config = require('../../agent-config.json');
@@ -9,33 +10,10 @@ const config = require('../../agent-config.json');
 // load contract and oracle addresses
 const contractAddresses = require('../../contract-addresses.json');
 
-const addressList = Object.values(contractAddresses).map((address) => address.toLowerCase());
+const addressList = Object.values(contractAddresses).map((item) => item.address.toLowerCase());
 
 // set up a variable to hold initialization data used in the handler
 const initializeData = {};
-
-// helper function to fetch abi
-function getAbi(abiName) {
-  // eslint-disable-next-line global-require,import/no-dynamic-require
-  const { abi } = require(`../../abi/${abiName}`);
-  return abi;
-}
-
-// helper function to filter logs based on contract addresses and event names
-function filterAndParseLogs(logs, address, iface, eventNames) {
-  // collect logs only from the contracts of interest
-  const contractLogs = logs.filter((log) => log.address === address);
-  if (contractLogs.length === 0) {
-    return [];
-  }
-
-  // decode logs and filter on the ones we are interested in
-  const parse = (log) => iface.parseLog(log);
-  const filter = (log) => eventNames.indexOf(log.name) !== -1;
-  const parsedLogs = contractLogs.map(parse).filter(filter);
-
-  return parsedLogs;
-}
 
 // helper function to create alerts
 function createAlert(
@@ -63,7 +41,7 @@ function createAlert(
     everestId,
     protocol: `${protocolName}`,
     metadata: {
-      address
+      address,
     },
   });
 }
@@ -108,10 +86,10 @@ function provideInitialize(data) {
 
     // store contracts as callable ethers Contract objects
     data.contracts = [];
-    Object.keys(contractAddresses).forEach((contract) => {
-      const addr = contractAddresses[contract];
-      const abi = getAbi(contract);
-      data.contracts.push(new ethers.Contract(addr, abi, provider));
+    Object.keys(contractAddresses).forEach((name) => {
+      const { address, abiFile } = contractAddresses[name];
+      const abi = getAbi(abiFile);
+      data.contracts.push(new ethers.Contract(address, abi, provider));
     });
 
     data.addresses = await getKeyAddresses(data);
@@ -133,8 +111,10 @@ function provideHandleTransaction(data) {
 
     // check if this tx changed any of the admins
     contracts.forEach((contract) => {
-      const parsedLogs = filterAndParseLogs(txEvent.logs, contract.address.toLowerCase(), contract.interface,
-        ['MinterChanged', 'NewAdmin', 'OwnerChanged', 'OwnershipTransferred', 'AdminChanged']);
+      const parsedLogs = filterAndParseLogs(
+        txEvent.logs, contract.address.toLowerCase(), contract.interface,
+        ['MinterChanged', 'NewAdmin', 'OwnerChanged', 'OwnershipTransferred', 'AdminChanged'],
+      );
       data.check = data.check || (parsedLogs.length > 0);
     });
 

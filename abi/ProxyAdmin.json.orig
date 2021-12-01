@@ -115,4 +115,8 @@
 		"stateMutability": "payable",
 		"type": "function"
 	}]
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> main
