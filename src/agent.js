@@ -1,10 +1,14 @@
 // transaction handlers
 const largeFlashSwap = require('./large-flash-swap/large-flash-swap');
+const adminEvents = require('./admin-events/admin-events');
+const addressWatch = require('./address-watch/address-watch');
 
 // block handlers
 
 const txHandlers = [
   largeFlashSwap,
+  adminEvents,
+  addressWatch,
 ];
 
 const blockHandlers = [
