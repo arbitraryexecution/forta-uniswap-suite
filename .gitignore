@@ -3,3 +3,5 @@ dist
 forta.config.json
 .env
 *.swp
+*.orig
+

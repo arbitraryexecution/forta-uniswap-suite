@@ -1,11 +1,13 @@
 // transaction handlers
 const adminEvents = require('./admin-events/admin-events');
+const addressWatch = require('./address-watch/address-watch');
 
 // block handlers
 // const blockHandlerName = require('./block-handler-name/block-handler-name');
 
 const txHandlers = [
   adminEvents,
+  addressWatch,
 ];
 
 const blockHandlers = [
