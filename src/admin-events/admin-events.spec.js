@@ -7,12 +7,16 @@ const { provideHandleTransaction, provideInitialize } = require('./admin-events'
 
 // retrieve a contract by name from the list of initialized contracts
 function getContractByName(contracts, name) {
-  let index = 0;
-  while (index < contracts.length && contracts[index].name !== name) {
-    index++;
+  const matches = contracts.filter((contract) => contract.name === name);
+  if (matches.length !== 1) {
+    if (matches.length === 0) {
+      throw new Error(`No matching contract found with name ${name}`);
+    } else {
+      throw new Error(`Multiple matching contracts found with name ${name}`);
+    }
   }
-  const contract = contracts[index];
-  return contract;
+
+  return matches[0];
 }
 
 // tests
@@ -56,7 +60,7 @@ describe('admin event monitoring', () => {
     it('returns empty findings if contract address matches but not event', async () => {
       const { contracts } = initializeData;
 
-      // retrieve the Object corresponding to the SafeBoxETH contract
+      // retrieve the Object corresponding to the GovernorBravo contract
       const governorBravoContract = getContractByName(contracts, 'GovernorBravo');
       const governorBravoAddress = governorBravoContract.address.toLowerCase();
 

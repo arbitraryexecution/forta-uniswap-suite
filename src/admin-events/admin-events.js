@@ -99,12 +99,16 @@ function provideInitialize(data) {
 
     // load the contract addresses, abis, and ethers interfaces
     data.contracts = contractNames.map((name) => {
-      const address = contractAddresses[name];
+      const { address, abiFile } = contractAddresses[name];
       if (address === undefined) {
         throw new Error(`No address found in contract-addresses.json for '${name}'`);
       }
 
-      const abi = getAbi(`${name}.json`);
+      if (abiFile === undefined) {
+        throw new Error(`No ABI file found in contract-addresses.json for '${name}'`);
+      }
+
+      const abi = getAbi(abiFile);
       const iface = new ethers.utils.Interface(abi);
 
       const contract = {
