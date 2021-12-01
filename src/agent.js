@@ -1,11 +1,11 @@
 // transaction handlers
-// const txHandlerName = require('./tx-handler-name/tx-handler-name');
+const adminEvents = require('./admin-events/admin-events');
 
 // block handlers
 // const blockHandlerName = require('./block-handler-name/block-handler-name');
 
 const txHandlers = [
-  // txHandlerName,
+  adminEvents,
 ];
 
 const blockHandlers = [
