@@ -40,9 +40,7 @@ async function getCoingeckoUSDPrice(tokenAddress) {
   const vsCurrency = '&vs_currencies=usd';
 
   const url = coingeckoApiUrl.concat(addressQuery.concat(vsCurrency));
-
   const response = await axios.get(url);
-
   const { data } = response;
 
   return data[tokenAddress].usd;

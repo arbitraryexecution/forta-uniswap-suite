@@ -1,84 +1,64 @@
 const {
-  Finding, FindingType, FindingSeverity, createBlockEvent,
+  Finding, FindingType, FindingSeverity, createBlockEvent, createTransactionEvent,
 } = require('forta-agent');
 
-/* common.js module mocking */
-jest.mock('../common', () => ({
-  ...jest.requireActual('ethers'),
-  getPoolInformation: jest.fn().mockResolvedValue(),
-  latestBlockPromise: jest.fn().mockResolvedValue(),
-}));
+const BigNumber = require('bignumber.js');
 
 /* ethers mocking */
-// create mock provider for ethers
-let mockBlockNumber = 0;
-const mockJsonRpcProvider = {
-  getBlockNumber: jest.fn().mockResolvedValue(mockBlockNumber),
+// uniswap v3 factory contract mock and pool mock
+const mockToken0Address = '0xFAKETOKEN0ADDRESS'; // .token0()
+const mockToken1Address = '0xFAKETOKEN1ADDRESS'; // .token1()
+const mockFee = 0; // .fee()
+const mockPoolAddress = '0xFAKEPOOLADDRESS';
+const mockDecimals = 3;
+const mockContract = {
+  getPool: jest.fn().mockResolvedValue(mockPoolAddress),
+  token0: jest.fn().mockResolvedValue(mockToken0Address),
+  token1: jest.fn().mockResolvedValue(mockToken1Address),
+  fee: jest.fn().mockResolvedValue(mockFee),
+  decimals: jest.fn().mockResolvedValue(mockDecimals),
 };
 
-const mockContract = {};
-// combine the mocked provider and contract into the ethers import mock
+// combine the mocked provider and contracts into the ethers import mock
 jest.mock('ethers', () => ({
   ...jest.requireActual('ethers'),
   providers: {
-    JsonRpcProvider: jest.fn().mockReturnValue(mockJsonRpcProvider),
+    JsonRpcBatchProvider: jest.fn(),
   },
   Contract: jest.fn().mockReturnValue(mockContract),
 }));
 const ethers = require('ethers');
 
+const utils = require('../utils');
+mockContract.interface = new ethers.utils.Interface(utils.getAbi('UniswapV3Pool'));
+
+const { createLog, createReceipt } = require('../event-utils');
+
 /* axios mocking */
-// mock response from Alpha Homora V2 API
-const mockAlphaHomoraV2Response = {
-  data: [],
-};
-
-// mock response from CoinGecko API
+const mockCoinGeckoData = {};
 const mockCoinGeckoResponse = {
-  data: {},
+  data: mockCoinGeckoData,
 };
-
-// mock the axios module for Alpha Homora V2 API and CoinGecko API calls
+jest.mock('axios', () => ({
+  get: jest.fn().mockResolvedValue(mockCoinGeckoResponse),
+}));
 const axios = require('axios');
 
-jest.mock('axios');
-axios.get = jest.fn(async (httpAddress) => {
-  if (httpAddress.includes('homora-api')) {
-    return mockAlphaHomoraV2Response;
-  }
-  if (httpAddress.includes('coingecko')) {
-    return mockCoinGeckoResponse;
-  }
-  throw new Error('Unexpected HTTP URL passed to mocked function');
-});
+const poolCreatedTopic = '0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118';
+const flashSwapTopic = '0xbdbdb71d7860376ba52b25a5028beea23581364a40522f6bcfb86bb1f2dca633';
+const EVEREST_ID = '0xa2e07f422b5d7cbbfca764e53b251484ecf945fa';
 
 /* handler import */
 // import the handler code after the mocked modules have been defined
-const { provideHandleBlock, provideInitialize } = require('./tvl-liquidity');
+const { provideHandleTransaction, provideInitialize } = require('./large-flash-swap');
 
-/* mock tests */
+/* axios mock test */
 describe('mock axios GET requests', () => {
   it('should call axios.get and return the mocked response for CoinGecko', async () => {
-    mockCoinGeckoResponse.data.ethereum = { eth: 1, usd: 1000000 };
-    const response = await axios.get('https://urlcontaining.coingecko.init');
+    mockCoinGeckoResponse.data = { '0xtokenaddress': { usd: 1000 } };
+    const response = await axios.get('https://url.url');
     expect(axios.get).toHaveBeenCalledTimes(1);
-    expect(response.data.ethereum.eth).toEqual(1);
-    expect(response.data.ethereum.usd).toEqual(1000000);
-
-    // reset call count for next test
-    axios.get.mockClear();
-    expect(axios.get).toHaveBeenCalledTimes(0);
-  });
-
-  it('should call axios.get and return the mocked response for Alpha Homora V2', async () => {
-    mockAlphaHomoraV2Response.data = [
-      { name: 'first', exchange: {} },
-      { name: 'second', exchange: {} },
-    ];
-    const response = await axios.get('https://urlcontaining.homora-api.init');
-    expect(axios.get).toHaveBeenCalledTimes(1);
-    expect(response.data[0].name).toEqual('first');
-    expect(response.data[1].name).toEqual('second');
+    expect(response.data['0xtokenaddress'].usd).toEqual(1000);
 
     // reset call count for next test
     axios.get.mockClear();
@@ -86,175 +66,192 @@ describe('mock axios GET requests', () => {
   });
 });
 
-// helper function for constructing mock pool data
-function getPool(key, name, wTokenType, wTokenAddress, lpTokenAddress, pid) {
-  return {
-    key, name, wTokenType, wTokenAddress, lpTokenAddress, pid,
-  };
-}
 
 /* handler tests */
-describe('total value locked monitoring', () => {
-  describe('handleBlock', () => {
+describe('large flash swap monitoring', () => {
+  describe('handleTransaction', () => {
     let initializeData;
     let handleBlock;
-    const mockLpTokenAddress0 = '0xLPTOKENADDRESS0';
-    const mockLpTokenAddress1 = '0xLPTOKENADDRESS1';
 
-    const decimals18 = ethers.BigNumber.from(10).pow(18);
+    // log with an event other than a FlashSwap event
+    // PoolCreated (index_topic_1 address token0, index_topic_2 address token1, index_topic_3 uint24 fee, int24 tickSpacing, address pool)
+    const logsNoMatchEvent = [
+      {
+        address: '',
+        topics: [
+          poolCreatedTopic,
+          ethers.constants.AddressZero, // token0
+          ethers.constants.AddressZero, // token1
+          ethers.constants.HashZero, // fee
+        ],
+        data: ethers.constants.HashZero + (ethers.constants.AddressZero).slice(2),
+      },
+    ];
 
-    // NOTE:
-    // balance of 1, LP token ether price 0 (2**112)*(10**18) and usd/ether of 1000
-    // should result in a TVL calculation of $1,000,000 USD
-    const mockWTokenBalance0 = ethers.BigNumber.from(1);
-    const mockWTokenBalance1 = ethers.BigNumber.from(1);
-    let mockLpTokenEthPrice0 = ethers.BigNumber.from(2).pow(112).mul(decimals18);
-    let mockLpTokenEthPrice1 = ethers.BigNumber.from(2).pow(112).mul(20000000000000);
-    let pool0;
-    let pool1;
+    // log that matches a FlashSwap event from a non-uniswap address
+    // Flash(index_topic_1 address sender, index_topic_2 address recipient, uint256 amount0, uint256 amount1, uint256 paid0, uint256 paid1)
+    const hashZero = ethers.constants.HashZero;
+    const invalidUniswapV3Address = '0xINVALIDUNISWAPV3POOLADDRESS';
+    const logsMatchFlashSwapEventInvalidAddress = [
+      {
+        address: invalidUniswapV3Address,
+        topics: [
+          flashSwapTopic,
+          ethers.constants.AddressZero, // sender
+          ethers.constants.AddressZero, // recipient
+        ],
+        data: hashZero + hashZero.slice(2) + hashZero.slice(2) + hashZero.slice(2),
+      },
+    ];
+
+    // log that matches a FlashSwap event from a uniswap v3 pool address
+    // Flash(index_topic_1 address sender, index_topic_2 address recipient, uint256 amount0, uint256 amount1, uint256 paid0, uint256 paid1)
+    const amount0 = 100;
+    const logsMatchFlashSwapEventAddressMatch = [
+      createLog(
+        mockContract.interface.getEvent('Flash'),
+        {
+          sender: ethers.constants.AddressZero,
+          recipient: ethers.constants.AddressZero,
+          amount0,
+          amount1: 0,
+          paid0: 0,
+          paid1: 0,
+        },
+        {
+          address: mockPoolAddress
+        },
+      )
+    ];
 
     beforeEach(async () => {
       initializeData = {};
 
-      // mock the Coin Gecko response
-      mockCoinGeckoResponse.data.ethereum = { eth: 1, usd: 1000 };
-
-      pool0 = getPool('key0', 'name0', 'WERC20', '0xWTOKEN0ADDRESS', mockLpTokenAddress0, 0);
-      pool1 = getPool('key1', 'name1', 'WMasterChef', '0xWTOKEN1ADDRESS', mockLpTokenAddress1, 1);
-      pool1.exchange = {
-        stakingAddress: '0xSTAKING1ADDRESS',
-      };
-      // mock the Alpha Homora V2 API pool response
-      mockAlphaHomoraV2Response.data = [pool0, pool1];
-
-      // only expect this to be called for the mocked WERC20 wTokenType
-      mockContract.balanceOf = jest.fn(async () => mockWTokenBalance0);
-
-      // only expect this to be called for the mocked WMasterChef wTokenType
-      mockContract.userInfo = jest.fn(async () => [mockWTokenBalance1, undefined]);
-
-      // this will be called for both mocked pools
-      mockContract.decimals = jest.fn(async () => 18);
-
-      // this will be called for both mocked pools
-      mockContract.getSafeETHPx = jest.fn(async (lpTokenAddress) => {
-        if (lpTokenAddress === mockLpTokenAddress0) {
-          return [mockLpTokenEthPrice0];
-        }
-        if (lpTokenAddress === mockLpTokenAddress1) {
-          return [mockLpTokenEthPrice1];
-        }
-        throw new Error('Unexpected lpTokenAddress passed to mocked function');
-      });
-
       // initialize the handler
+      // this will create the mock provider and mock factory contract
       await (provideInitialize(initializeData))();
-      handleBlock = provideHandleBlock(initializeData);
+      handleTransaction = provideHandleTransaction(initializeData);
     });
 
-    it('returns empty findings if not enough blocks have been seen', async () => {
-      // get the minimum number of blocks necessary to create a finding
-      const { minElements } = initializeData.config;
+    it('returns empty findings if no flash swaps occurred', async () => {
+      const receipt = {
+        logs: logsNoMatchEvent,
+      };
+      const addresses = {'0x1': true};
+      const txEvent = createTransactionEvent({ receipt, addresses });
 
-      // generate blocks until we are at 2 fewer than the minimum
-      let mockBlockEvent;
-      let findings;
-      mockBlockNumber = 1;
-      while (mockBlockNumber < (minElements - 2)) {
-        mockBlockEvent = createBlockEvent({ block: { mockBlockNumber } });
-        // eslint-disable-next-line no-await-in-loop
-        findings = await handleBlock(mockBlockEvent);
-        expect(findings).toStrictEqual([]);
-        mockBlockNumber++;
-      }
+      const findings = await handleTransaction(txEvent);
 
-      // now generate one block with a vastly different value for the different fields
-      // the math should meet the criteria for generating a finding
-      // but because enough blocks have not been received, no finding should be generated
-      mockLpTokenEthPrice0 = mockLpTokenEthPrice0.mul(1000);
-      mockLpTokenEthPrice1 = mockLpTokenEthPrice1.mul(1000);
-
-      mockBlockEvent = createBlockEvent({ block: { mockBlockNumber } });
-      findings = await handleBlock(mockBlockEvent);
       expect(findings).toStrictEqual([]);
+      expect(axios.get).toHaveBeenCalledTimes(0);
+      expect(mockContract.token0).toHaveBeenCalledTimes(0);
     });
 
-    it('returns empty findings if threshold is not exceeded', async () => {
-      // get the minimum number of blocks necessary to create a finding
-      const { minElements } = initializeData.config;
+    it('returns empty findings a FlashSwap event occurred for a non-Uniswap V3 pool ', async () => {
+      const receipt = {
+        logs: logsMatchFlashSwapEventInvalidAddress,
+      };
+      const addresses = {'0x1': true};
+      const txEvent = createTransactionEvent({ receipt, addresses });
 
-      // generate blocks until we are over the minimum number
-      // this will continue to use the default values of the token prices and amounts
-      let mockBlockEvent;
-      let findings;
-      mockBlockNumber = 1;
-      while (mockBlockNumber < (minElements + 2)) {
-        mockBlockEvent = createBlockEvent({ block: { mockBlockNumber } });
-        // eslint-disable-next-line no-await-in-loop
-        findings = await handleBlock(mockBlockEvent);
-        expect(findings).toStrictEqual([]);
-        mockBlockNumber++;
-      }
+      const findings = await handleTransaction(txEvent);
 
-      // ensure that the number of blocks is greater than the minimum required for alerts
-      const dataset0 = initializeData.rollingLiquidityData[mockLpTokenAddress0].tvl;
-      expect(dataset0.getNumElements()).toBeGreaterThan(minElements);
-
-      const dataset1 = initializeData.rollingLiquidityData[mockLpTokenAddress1].tvl;
-      expect(dataset1.getNumElements()).toBeGreaterThan(minElements);
+      expect(findings).toStrictEqual([]);
+      expect(axios.get).toHaveBeenCalledTimes(0);
+      expect(mockContract.token0).toHaveBeenCalledTimes(1);
+      expect(mockContract.token1).toHaveBeenCalledTimes(1);
+      expect(mockContract.fee).toHaveBeenCalledTimes(1);
+      mockContract.token0.mockClear();
+      mockContract.token1.mockClear();
+      mockContract.fee.mockClear();
     });
 
-    it('returns findings if threshold is exceeded and enough blocks have been seen', async () => {
-      // get the minimum number of blocks necessary to create a finding
-      const { minElements } = initializeData.config;
+    it('returns empty findings for a FlashSwap event lower than the threshold', async () => {
+      const receipt = {
+        logs: logsMatchFlashSwapEventAddressMatch,
+      };
+      const addresses = {};
+      addresses[mockPoolAddress] = true;
+      const txEvent = createTransactionEvent({ receipt, addresses });
 
-      // generate blocks until we are at 1 fewer than the number required for triggering an alert
-      let mockBlockEvent;
-      let findings;
-      mockBlockNumber = 1;
-      while (mockBlockNumber < minElements + 1) {
-        mockBlockEvent = createBlockEvent({ block: { mockBlockNumber } });
-        // eslint-disable-next-line no-await-in-loop
-        findings = await handleBlock(mockBlockEvent);
-        expect(findings).toStrictEqual([]);
-        mockBlockNumber++;
-      }
+      // set up the mocked response from axios to return the price of the token
+      // intentionally set the price low enough that the threshold is not exceeded
+      const threshold = initializeData.flashSwapThresholdUSD;
 
-      // now generate one block with a vastly different value for the different fields
-      // the math should meet the criteria for generating a finding
-      // enough blocks have been seen that an alert should be generated
-      mockLpTokenEthPrice0 = mockLpTokenEthPrice0.mul(10);
-      mockBlockEvent = createBlockEvent({ block: { mockBlockNumber } });
-      findings = await handleBlock(mockBlockEvent);
+      const decimalScaling = (new BigNumber(10)).pow(mockDecimals);
+      const amount0Scaled = (new BigNumber(amount0)).div(decimalScaling);
+      const usdPricePerToken = threshold.minus(1).div(amount0Scaled);
+      const usdPricePerTokenNum = parseInt(usdPricePerToken.toString(), 10);
 
-      // ensure that the number of blocks is greater than the minimum required for alerts
-      const dataset = initializeData.rollingLiquidityData[mockLpTokenAddress0].tvl;
-      expect(dataset.getNumElements()).toBeGreaterThan(minElements);
+      // set up the coin gecko response to return a value that will not cause a finding
+      mockCoinGeckoResponse.data = {}
+      mockCoinGeckoResponse.data[mockToken0Address.toLowerCase()] = { usd: usdPricePerTokenNum };
 
-      // create the finding we expect
-      // the price for all previous blocks was $1M USD
-      // the price for this block is $10M USD
-      // therefore, we expect the delta over the threshold to be $10M - $1M = $9M USD
-      const expectedFinding = Finding.fromObject({
-        name: 'Alpha Finance TVL Agent',
-        description: `Alpha-Homora V2 pool ${pool0.name} has a large change in TVL`,
-        alertId: 'AE-ALPHAFI-TVL-LIQUIDITY-EVENT',
-        type: FindingType.Degraded,
-        severity: FindingSeverity.Low,
-        everestId: initializeData.everestId,
-        protocol: 'Alpha Finance',
-        metadata: {
-          key: pool0.key,
-          lpTokenAddress: pool0.lpTokenAddress,
-          wTokenAddress: pool0.wTokenAddress,
-          wTokenType: pool0.wTokenType,
-          threshold: '0',
-          deltaOverThreshold: '9000000',
-        },
-      });
+      // this will determine that the FlashSwap included an amount of 256 tokens of token0
+      const findings = await handleTransaction(txEvent);
 
-      // assert the finding
-      expect(findings).toStrictEqual([expectedFinding]);
+      expect(axios.get).toHaveBeenCalledTimes(1);
+      expect(findings).toStrictEqual([]);
+      axios.get.mockClear();
+      expect(axios.get).toHaveBeenCalledTimes(0);
+      expect(mockContract.token0).toHaveBeenCalledTimes(1);
+      expect(mockContract.token1).toHaveBeenCalledTimes(1);
+      expect(mockContract.fee).toHaveBeenCalledTimes(1);
+      mockContract.token0.mockClear();
+      mockContract.token1.mockClear();
+      mockContract.fee.mockClear();
     });
+
+    it('returns a finding for a FlashSwap event over the threshold', async () => {
+      const receipt = {
+        logs: logsMatchFlashSwapEventAddressMatch,
+      };
+      const addresses = {};
+      addresses[mockPoolAddress] = true;
+      const txEvent = createTransactionEvent({ receipt, addresses });
+
+      // set up the mocked response from axios to return the price of the token
+      // intentionally set the price just over the threshold for a finding
+      const threshold = initializeData.flashSwapThresholdUSD;
+
+      const decimalScaling = (new BigNumber(10)).pow(mockDecimals);
+      const amount0Scaled = (new BigNumber(amount0)).div(decimalScaling);
+      const usdPricePerToken = threshold.plus(1).div(amount0Scaled);
+      const usdPricePerTokenNum = parseInt(usdPricePerToken.toString(), 10);
+
+      // set up the coin gecko response to the appropriate price to cause a finding
+      mockCoinGeckoResponse.data = {}
+      mockCoinGeckoResponse.data[mockToken0Address.toLowerCase()] = { usd: usdPricePerTokenNum };
+
+      // this will determine that the FlashSwap included an amount of 256 tokens of token0
+      const findings = await handleTransaction(txEvent);
+
+      const expectedFindings = [
+        Finding.fromObject({
+          name: 'Uniswap V3 Large Flash Swap',
+          description: `Large Flash Swap from pool ${mockPoolAddress}`,
+          alertId: 'AE-UNISWAPV3-LARGE-FLASH-SWAP',
+          severity: FindingSeverity.Info,
+          type: FindingType.Info,
+          protocol: 'UniswapV3',
+          everestId: EVEREST_ID,
+          metadata: {
+            address: mockPoolAddress,
+            token0Amount: amount0.toString(),
+            token1Amount: '0',
+            sender: ethers.constants.AddressZero,
+            token0EquivalentUSD: (threshold.plus(1)).toString(),
+            token1EquivalentUSD: '0',
+            flashSwapThresholdUSD: (threshold.toString()),
+          },
+        }),
+      ];
+
+      expect(axios.get).toHaveBeenCalledTimes(1);
+      expect(findings).toStrictEqual(expectedFindings);
+      axios.get.mockClear();
+      expect(axios.get).toHaveBeenCalledTimes(0);
+    });
+
   });
 });
