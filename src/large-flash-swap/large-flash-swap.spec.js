@@ -1,5 +1,5 @@
 const {
-  Finding, FindingType, FindingSeverity, createBlockEvent, createTransactionEvent,
+  Finding, FindingType, FindingSeverity, createTransactionEvent,
 } = require('forta-agent');
 
 const BigNumber = require('bignumber.js');
@@ -29,11 +29,6 @@ jest.mock('ethers', () => ({
 }));
 const ethers = require('ethers');
 
-const utils = require('../utils');
-mockContract.interface = new ethers.utils.Interface(utils.getAbi('UniswapV3Pool'));
-
-const { createLog, createReceipt } = require('../event-utils');
-
 /* axios mocking */
 const mockCoinGeckoData = {};
 const mockCoinGeckoResponse = {
@@ -43,6 +38,12 @@ jest.mock('axios', () => ({
   get: jest.fn().mockResolvedValue(mockCoinGeckoResponse),
 }));
 const axios = require('axios');
+
+const utils = require('../utils');
+
+mockContract.interface = new ethers.utils.Interface(utils.getAbi('UniswapV3Pool'));
+
+const { createLog } = require('../event-utils');
 
 const poolCreatedTopic = '0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118';
 const flashSwapTopic = '0xbdbdb71d7860376ba52b25a5028beea23581364a40522f6bcfb86bb1f2dca633';
@@ -66,46 +67,26 @@ describe('mock axios GET requests', () => {
   });
 });
 
-
 /* handler tests */
 describe('large flash swap monitoring', () => {
   describe('handleTransaction', () => {
     let initializeData;
-    let handleBlock;
+    let handleTransaction;
 
     // log with an event other than a FlashSwap event
-    // PoolCreated (index_topic_1 address token0, index_topic_2 address token1, index_topic_3 uint24 fee, int24 tickSpacing, address pool)
-    const logsNoMatchEvent = [
-      {
-        address: '',
-        topics: [
-          poolCreatedTopic,
-          ethers.constants.AddressZero, // token0
-          ethers.constants.AddressZero, // token1
-          ethers.constants.HashZero, // fee
-        ],
-        data: ethers.constants.HashZero + (ethers.constants.AddressZero).slice(2),
-      },
-    ];
+    const logsNoMatchEvent = [{ topics: [poolCreatedTopic] }];
 
     // log that matches a FlashSwap event from a non-uniswap address
-    // Flash(index_topic_1 address sender, index_topic_2 address recipient, uint256 amount0, uint256 amount1, uint256 paid0, uint256 paid1)
-    const hashZero = ethers.constants.HashZero;
-    const invalidUniswapV3Address = '0xINVALIDUNISWAPV3POOLADDRESS';
     const logsMatchFlashSwapEventInvalidAddress = [
       {
-        address: invalidUniswapV3Address,
+        address: '0xINVALIDUNISWAPV3POOLADDRESS',
         topics: [
           flashSwapTopic,
-          ethers.constants.AddressZero, // sender
-          ethers.constants.AddressZero, // recipient
         ],
-        data: hashZero + hashZero.slice(2) + hashZero.slice(2) + hashZero.slice(2),
       },
     ];
 
     // log that matches a FlashSwap event from a uniswap v3 pool address
-    // Flash(index_topic_1 address sender, index_topic_2 address recipient, uint256 amount0, uint256 amount1, uint256 paid0, uint256 paid1)
     const amount0 = 100;
     const logsMatchFlashSwapEventAddressMatch = [
       createLog(
@@ -119,9 +100,9 @@ describe('large flash swap monitoring', () => {
           paid1: 0,
         },
         {
-          address: mockPoolAddress
+          address: mockPoolAddress,
         },
-      )
+      ),
     ];
 
     beforeEach(async () => {
@@ -137,7 +118,7 @@ describe('large flash swap monitoring', () => {
       const receipt = {
         logs: logsNoMatchEvent,
       };
-      const addresses = {'0x1': true};
+      const addresses = { '0x1': true };
       const txEvent = createTransactionEvent({ receipt, addresses });
 
       const findings = await handleTransaction(txEvent);
@@ -151,7 +132,7 @@ describe('large flash swap monitoring', () => {
       const receipt = {
         logs: logsMatchFlashSwapEventInvalidAddress,
       };
-      const addresses = {'0x1': true};
+      const addresses = { '0x1': true };
       const txEvent = createTransactionEvent({ receipt, addresses });
 
       const findings = await handleTransaction(txEvent);
@@ -184,7 +165,7 @@ describe('large flash swap monitoring', () => {
       const usdPricePerTokenNum = parseInt(usdPricePerToken.toString(), 10);
 
       // set up the coin gecko response to return a value that will not cause a finding
-      mockCoinGeckoResponse.data = {}
+      mockCoinGeckoResponse.data = {};
       mockCoinGeckoResponse.data[mockToken0Address.toLowerCase()] = { usd: usdPricePerTokenNum };
 
       // this will determine that the FlashSwap included an amount of 256 tokens of token0
@@ -220,7 +201,7 @@ describe('large flash swap monitoring', () => {
       const usdPricePerTokenNum = parseInt(usdPricePerToken.toString(), 10);
 
       // set up the coin gecko response to the appropriate price to cause a finding
-      mockCoinGeckoResponse.data = {}
+      mockCoinGeckoResponse.data = {};
       mockCoinGeckoResponse.data[mockToken0Address.toLowerCase()] = { usd: usdPricePerTokenNum };
 
       // this will determine that the FlashSwap included an amount of 256 tokens of token0
@@ -252,6 +233,5 @@ describe('large flash swap monitoring', () => {
       axios.get.mockClear();
       expect(axios.get).toHaveBeenCalledTimes(0);
     });
-
   });
 });
