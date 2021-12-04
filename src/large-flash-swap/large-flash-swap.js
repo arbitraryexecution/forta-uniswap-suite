@@ -1,7 +1,8 @@
-// example flash swap: 0x2099b13dd16b631f57b1e76df5ee36b3d22ca2665df2a30e6531f74e083c5db7
-// example flash swap: 0x6b5c38dd208c7b1f30176743b789c8dde9ffb4cf4fb107b94445044199b326df
-// example pool creation: 0xf1f0431ffc589a8f278aaf8ce8aa682dd099574529a0f2d8e53dc622ed8bbc51
+// example flash swap: 0x8c97790e8a16b71968b7d194892966b86e3d898c7d166086d4d8831ed3fbaff3
+// example flash swap: 0x1cd2db6d7da6459585c4af8e217ff65cf645aa40a75a381596615fd3e0e3f8ea
 const ethers = require('ethers');
+const BigNumber = require('bignumber.js');
+const axios = require('axios');
 
 const {
   Finding, FindingType, FindingSeverity, getJsonRpcUrl,
@@ -11,124 +12,68 @@ const {
 const config = require('../../agent-config.json');
 
 const utils = require('../utils');
-const common = require('./common');
 
+const DECIMALS_ABI = ['function decimals() view returns (uint8)'];
 const FLASH_SIGNATURE = 'Flash(address,address,uint256,uint256,uint256,uint256)';
 
 // set up a variable to hold initialization data used in the handler
 const initializeData = {};
 
-async function updatePoolInformation(blockNumber, data) {
-  // if the pools have not been updated once since the initialize() function was called, update
-  // them now
-  if (blockNumber > data.latestBlock + 1) {
-    data.latestBlock = await common.getPoolInformation(
-      data.provider,
-      data.factoryContract,
-      data.latestBlock + 1,
-      blockNumber - 1,
-      data.poolInformation,
-    );
-  }
-
-  // determine the conversion from each token to USDC
-  common.createConversionGraph(data.poolInformation);
-
-  // set the variable so this code does not run again
-  data.upToDate = true;
-}
-
 function provideInitialize(data) {
   return async function initialize() {
     /* eslint-disable no-param-reassign */
-
-    // get all of the data for the Uniswap V3 pools
-    data.latestBlock = await common.latestBlockPromise;
-
-    data.everestId = config.UNISWAP_V3_EVEREST_ID;
+    data.everestId = config.EVEREST_ID;
 
     data.provider = new ethers.providers.JsonRpcBatchProvider(getJsonRpcUrl());
     data.factoryContract = utils.getContract('UniswapV3Factory', data.provider);
 
-    data.POOL_CREATED_SIGNATURE = common.POOL_CREATED_SIGNATURE;
-
-    data.poolInformation = {};
-    await common.getPoolInformation(
-      data.provider,
-      data.factoryContract,
-      config.poolInformation.startBlock,
-      'latest',
-      data.poolInformation,
-    );
-
-    data.flashSwapThresholdUSDC = ethers.BigNumber.from(config.largeFlashSwap.thresholdUSDC);
+    data.flashSwapThresholdUSD = new BigNumber(config.largeFlashSwap.thresholdUSD);
 
     data.poolAbi = utils.getAbi('UniswapV3Pool');
-
-    data.upToDate = false;
-
     /* eslint-enable no-param-reassign */
   };
 }
 
+async function getCoingeckoUSDPrice(tokenAddress) {
+  const coingeckoApiUrl = 'https://api.coingecko.com/api/v3/simple/token_price/ethereum?';
+  const addressQuery = `contract_addresses=${tokenAddress}`;
+  const vsCurrency = '&vs_currencies=usd';
+
+  const url = coingeckoApiUrl.concat(addressQuery.concat(vsCurrency));
+
+  const response = await axios.get(url);
+
+  const { data } = response;
+
+  return data[tokenAddress].usd;
+}
+
+async function getAmountValue(amountBN, tokenAddress, provider) {
+  const tokenPrice = await getCoingeckoUSDPrice(tokenAddress.toLowerCase());
+
+  // get the decimal scaling for this token
+  // calling .decimals() may fail for a vyper contract
+  const contract = new ethers.Contract(tokenAddress, DECIMALS_ABI, provider);
+  const decimals = await contract.decimals();
+  const denominator = (new BigNumber(10)).pow(decimals);
+
+  // multiply by the price and divide out decimal places
+  return amountBN.times(tokenPrice).div(denominator);
+}
+
 function provideHandleTransaction(data) {
   return async function handleTransaction(txEvent) {
-    if (data.upToDate === false) {
-      await updatePoolInformation(txEvent.blockNumber, data);
-    }
-
     const {
       poolAbi,
       provider,
       factoryContract,
-      poolInformation,
       everestId,
-      POOL_CREATED_SIGNATURE,
-      flashSwapThresholdUSDC,
+      flashSwapThresholdUSD,
     } = data;
 
-    if (!poolInformation) throw new Error('handleTransaction called before initialization');
+    if (!factoryContract) throw new Error('handleTransaction called before initialization');
 
     const findings = [];
-
-    // check if any new pools were created
-    const poolCreated = txEvent.filterEvent(
-      POOL_CREATED_SIGNATURE,
-      factoryContract.address,
-    );
-    if (poolCreated.length > 0) {
-      poolCreated.forEach((poolCreatedEvent) => {
-        const { data: eventData, topics } = poolCreatedEvent;
-        const {
-          args: {
-            token0,
-            token1,
-            fee,
-            tickSpacing,
-            pool: newPoolAddress,
-          },
-        } = factoryContract.interface.parseLog({ data: eventData, topics });
-
-        // add the pool information
-        const finding = Finding.fromObject({
-          name: 'Uniswap V3 New Pool Created',
-          description: `New Pool created at ${newPoolAddress} for tokens: ${token0} - ${token1}`,
-          alertId: 'AE-UNISWAPV3-NEW-POOL',
-          severity: FindingSeverity.Info,
-          type: FindingType.Info,
-          protocol: 'UniswapV3',
-          everestId,
-          metadata: {
-            address: newPoolAddress,
-            token0,
-            token1,
-            fee,
-            tickSpacing,
-          },
-        });
-        findings.push(finding);
-      });
-    }
 
     // check for flash swaps on any addresses
     // if there are any matches, check against the array of pool addresses
@@ -138,11 +83,23 @@ function provideHandleTransaction(data) {
       const flashSwapPromises = flashSwaps.map(async (flashSwapEvent) => {
         const { address, data: eventData, topics } = flashSwapEvent;
 
-        if ((Object.keys(poolInformation)).indexOf(address) === -1) {
+        // check the flash swap against the factory contract to verify that it belongs to
+        // uniswap v3
+        const poolContract = new ethers.Contract(address, poolAbi, provider);
+
+        const token0 = await poolContract.token0();
+        const token1 = await poolContract.token1();
+        const fee = await poolContract.fee();
+
+        // for the given tokens and fee, get the correlated pool address from the factory contract
+        const expectedAddress = await data.factoryContract.getPool(token0, token1, fee);
+
+        // if the contract addresses do not match, this is not a uniswap v3 pool
+        if (address.toLowerCase() !== expectedAddress.toLowerCase()) {
           return undefined;
         }
 
-        const poolContract = new ethers.Contract(address, poolAbi, provider);
+        // parse the information from the flash swap
         const {
           args: {
             sender,
@@ -151,53 +108,50 @@ function provideHandleTransaction(data) {
           },
         } = poolContract.interface.parseLog({ data: eventData, topics });
 
+        // convert from ethers.js bignumber to bignumber.js
+        const amount0BN = new BigNumber(amount0.toHexString());
+        const amount1BN = new BigNumber(amount1.toHexString());
+
         const flashSwapInfo = {
           address,
-          amount0,
-          amount1,
+          amount0: amount0BN,
+          amount1: amount1BN,
           sender,
-          token0EquivalentUSDC: ethers.BigNumber.from(0),
-          token1EquivalentUSDC: ethers.BigNumber.from(0),
+          token0EquivalentUSD: new BigNumber(0),
+          token1EquivalentUSD: new BigNumber(0),
         };
 
-        if (amount0.gt(0)) {
-          const convert0Arrays = poolInformation[address].token0Conversion;
-          if (convert0Arrays) {
-            const conversion0Promises = convert0Arrays.map((arr) => arr[1](arr[0]));
-            const results0 = await Promise.all(conversion0Promises);
-            results0.unshift(amount0);
-            const value0USDC = results0.reduce((product, value) => product.mul(value));
-            flashSwapInfo.token0EquivalentUSDC = flashSwapInfo.token0EquivalentUSDC.add(value0USDC);
-          }
+        if (amount0BN.gt(0)) {
+          const token0Value = await getAmountValue(amount0BN, token0, provider);
+          flashSwapInfo.token0EquivalentUSD = flashSwapInfo.token0EquivalentUSD.plus(token0Value);
         }
 
-        if (amount1.gt(0)) {
-          const convert1Arrays = poolInformation[address].token1Conversion;
-          if (convert1Arrays) {
-            const conversion1Promises = convert1Arrays.map((arr) => arr[1](arr[0]));
-            const results1 = await Promise.all(conversion1Promises);
-            results1.unshift(amount1);
-            const value1USDC = results1.reduce((product, value) => product.mul(value));
-            flashSwapInfo.token1EquivalentUSDC = flashSwapInfo.token1EquivalentUSDC.add(value1USDC);
-          }
+        if (amount1BN.gt(0)) {
+          const token1Value = await getAmountValue(amount1BN, token1, provider);
+          flashSwapInfo.token1EquivalentUSD = flashSwapInfo.token1EquivalentUSD.plus(token1Value);
         }
+
         return flashSwapInfo;
       });
 
+      // settle the promises
       let flashSwapResults = await Promise.all(flashSwapPromises);
+
+      // filter out undefined entries in the results
       flashSwapResults = flashSwapResults.filter((result) => result !== undefined);
 
+      // check the flash swaps for any that exceeded the threshold value
       flashSwapResults.forEach((result) => {
         const {
           address,
           amount0,
           amount1,
           sender,
-          token0EquivalentUSDC,
-          token1EquivalentUSDC,
+          token0EquivalentUSD,
+          token1EquivalentUSD,
         } = result;
 
-        if (token0EquivalentUSDC.add(token1EquivalentUSDC).gt(flashSwapThresholdUSDC)) {
+        if (token0EquivalentUSD.plus(token1EquivalentUSD).gt(flashSwapThresholdUSD)) {
           const finding = Finding.fromObject({
             name: 'Uniswap V3 Large Flash Swap',
             description: `Large Flash Swap from pool ${address}`,
@@ -211,9 +165,9 @@ function provideHandleTransaction(data) {
               token0Amount: amount0.toString(),
               token1Amount: amount1.toString(),
               sender,
-              token0EquivalentUSDC: token0EquivalentUSDC.toString(),
-              token1EquivalentUSDC: token1EquivalentUSDC.toString(),
-              flashSwapThresholdUSDC: flashSwapThresholdUSDC.toString(),
+              token0EquivalentUSD: token0EquivalentUSD.toString(),
+              token1EquivalentUSD: token1EquivalentUSD.toString(),
+              flashSwapThresholdUSD: flashSwapThresholdUSD.toString(),
             },
           });
           findings.push(finding);

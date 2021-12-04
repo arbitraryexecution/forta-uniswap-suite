@@ -3,9 +3,9 @@ const ethers = require('ethers');
 const contractAddresses = require('../contract-addresses.json');
 
 // helper function for loading a contract abi
-function getAbi(abiName) {
+function getAbi(abiFile) {
   // eslint-disable-next-line global-require,import/no-dynamic-require
-  const { abi } = require(`../abi/${abiName}.json`);
+  const { abi } = require(`../abi/${abiFile}`);
   return abi;
 }
 
@@ -23,16 +23,16 @@ function getProvider(jsonRpcUrl) {
 
 // helper function for creating an ethers.js Interface object
 function getInterface(name) {
-  const { abiName } = contractAddresses[name];
-  const { abi } = getAbi(abiName);
+  const { abiFile } = contractAddresses[name];
+  const { abi } = getAbi(abiFile);
   const iface = new ethers.utils.Interface(abi);
   return iface;
 }
 
 // helper function for creating an ethers.js Contract object
 function getContract(name, provider) {
-  const { address, abiName } = contractAddresses[name];
-  const abi = getAbi(abiName);
+  const { address, abiFile } = contractAddresses[name];
+  const abi = getAbi(abiFile);
   const contract = new ethers.Contract(address, abi, provider);
   return contract;
 }
