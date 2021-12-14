@@ -43,8 +43,6 @@ const utils = require('../utils');
 
 mockContract.interface = new ethers.utils.Interface(utils.getAbi('UniswapV3Pool'));
 
-const { createLog } = require('../event-utils');
-
 const poolCreatedTopic = ethers.utils.id('PoolCreated(address,address,uint24,int24,address)');
 const flashSwapTopic = ethers.utils.id('Flash(address,address,uint256,uint256,uint256,uint256)');
 
@@ -89,22 +87,17 @@ describe('large flash swap monitoring', () => {
 
     // log that matches a FlashSwap event from a uniswap v3 pool address
     const amount0 = 100;
-    const logsMatchFlashSwapEventAddressMatch = [
-      createLog(
-        mockContract.interface.getEvent('Flash'),
-        {
-          sender: ethers.constants.AddressZero,
-          recipient: ethers.constants.AddressZero,
-          amount0,
-          amount1: 0,
-          paid0: 0,
-          paid1: 0,
-        },
-        {
-          address: mockPoolAddress,
-        },
-      ),
-    ];
+    const amount0Hex64 = amount0.toString(16).padStart(64, '0');
+    const hashZero = (ethers.constants.HashZero).slice(2);
+    const logsMatchFlashSwapEventAddressMatch = [{
+      address: '0xFAKEPOOLADDRESS',
+      topics: [
+        flashSwapTopic,
+        ethers.constants.HashZero,
+        ethers.constants.HashZero,
+      ],
+      data: `0x${amount0Hex64}${hashZero}${hashZero}${hashZero}`,
+    }];
 
     beforeEach(async () => {
       initializeData = {};
