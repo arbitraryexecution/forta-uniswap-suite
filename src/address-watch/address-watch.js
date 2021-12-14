@@ -1,6 +1,5 @@
-const ethers = require('ethers');
 const {
-  Finding, FindingSeverity, FindingType, getJsonRpcUrl,
+  Finding, FindingSeverity, FindingType, ethers, getEthersProvider,
 } = require('forta-agent');
 const { getAbi, filterAndParseLogs } = require('../common');
 
@@ -82,7 +81,7 @@ function provideInitialize(data) {
     data.protocolAbbreviation = config.PROTOCOL_ABBREVIATION;
 
     // initialize a provider object to set up callable contract objects
-    const provider = new ethers.providers.JsonRpcProvider(getJsonRpcUrl());
+    const provider = getEthersProvider();
 
     // store contracts as callable ethers Contract objects
     data.contracts = [];

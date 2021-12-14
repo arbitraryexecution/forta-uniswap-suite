@@ -1,5 +1,4 @@
-const ethers = require('ethers');
-const { Finding, FindingSeverity, FindingType } = require('forta-agent');
+const { Finding, FindingSeverity, FindingType, ethers } = require('forta-agent');
 const { getAbi, filterAndParseLogs, extractEventArgs } = require('../common');
 
 // load any agent configuration parameters

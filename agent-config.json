@@ -33,5 +33,8 @@
     "Uni": {
       "MinterChanged": { "type": "Suspicioius", "severity": "High" }
     }
+  },
+  "largeFlashSwap": {
+    "thresholdUSD": 100000
   }
 }
