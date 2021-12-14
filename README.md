@@ -19,23 +19,23 @@ the following handlers:
 
 <!-- -->
 - AE-UNISWAPV3-ADMIN-EVENT
- - Fired on any event in the 'adminEvents' section of agent-config.json
- - Severity and Type are set to the corresponding values in agent-config.json
- - Metadata field contains contract name, contract address, event name, and event arguments
+  - Fired on any event in the 'adminEvents' section of agent-config.json
+  - Severity and Type are set to the corresponding values in agent-config.json
+  - Metadata field contains contract name, contract address, event name, and event arguments
 
 <!-- -->
 - AE-UNISWAPV3-ADDRESS-WATCH
- - Fired when any address that is a 'minter', 'owner', or 'admin' is involved in a transaction
- - Severity is set to "info" if the transaction involves a protocol contract, otherwise severity is set to "medium"
- - Type is set to "info" if the transaction involves a protocol contract, otherwise type is set to "suspicious"
- - Metadata field contains the address involved in the transaction
+  - Fired when any address that is a 'minter', 'owner', or 'admin' is involved in a transaction
+  - Severity is set to "info" if the transaction involves a protocol contract, otherwise severity is set to "medium"
+  - Type is set to "info" if the transaction involves a protocol contract, otherwise type is set to "suspicious"
+  - Metadata field contains the address involved in the transaction
 
 <!-- -->
 - AE-UNISWAPV3-LARGE-FLASH-SWAP
- - Fired on any Flash event from a Uniswap V3 Pool contract with USD value exceeding the threshold specified in agent-config.json
- - Severity is always set to "info"
- - Type is always set to "info"
- - Metadata field contains:
+  - Fired on any Flash event from a Uniswap V3 Pool contract with USD value exceeding the threshold specified in agent-config.json
+  - Severity is always set to "info"
+  - Type is always set to "info"
+  - Metadata field contains:
     - Pool address
     - Amount of token 0 involved in swap
     - Amount of token 1 involved in swap
