@@ -1,11 +1,10 @@
 // example flash swap: 0x8c97790e8a16b71968b7d194892966b86e3d898c7d166086d4d8831ed3fbaff3
 // example flash swap: 0x1cd2db6d7da6459585c4af8e217ff65cf645aa40a75a381596615fd3e0e3f8ea
-const ethers = require('ethers');
 const BigNumber = require('bignumber.js');
 const axios = require('axios');
 
 const {
-  Finding, FindingType, FindingSeverity, getJsonRpcUrl,
+  Finding, FindingType, FindingSeverity, ethers, getEthersProvider,
 } = require('forta-agent');
 
 // load any agent configuration parameters
@@ -24,35 +23,43 @@ function provideInitialize(data) {
     /* eslint-disable no-param-reassign */
     data.everestId = config.EVEREST_ID;
 
-    data.provider = new ethers.providers.JsonRpcBatchProvider(getJsonRpcUrl());
+    data.provider = getEthersProvider();
+
     data.factoryContract = utils.getContract('UniswapV3Factory', data.provider);
 
     data.flashSwapThresholdUSD = new BigNumber(config.largeFlashSwap.thresholdUSD);
 
-    data.poolAbi = utils.getAbi('UniswapV3Pool');
+    data.poolAbi = utils.getAbi('UniswapV3Pool.json');
     /* eslint-enable no-param-reassign */
   };
 }
 
-async function getCoingeckoUSDPrice(tokenAddress) {
+async function getTokenPrices(token0Address, token1Address) {
   const coingeckoApiUrl = 'https://api.coingecko.com/api/v3/simple/token_price/ethereum?';
-  const addressQuery = `contract_addresses=${tokenAddress}`;
+  const addressQuery = `contract_addresses=${token0Address},${token1Address}`;
   const vsCurrency = '&vs_currencies=usd';
 
   const url = coingeckoApiUrl.concat(addressQuery.concat(vsCurrency));
-  const response = await axios.get(url);
-  const { data } = response;
+  const { data } = await axios.get(url);
 
-  return data[tokenAddress].usd;
+  // parse the response and convert the prices to BigNumber.js type
+  const usdPerToken0 = new BigNumber(data[token0Address.toLowerCase()].usd);
+  const usdPerToken1 = new BigNumber(data[token1Address.toLowerCase()].usd);
+
+  return { token0Price: usdPerToken0, token1Price: usdPerToken1 };
 }
 
-async function getAmountValue(amountBN, tokenAddress, provider) {
-  const tokenPrice = await getCoingeckoUSDPrice(tokenAddress.toLowerCase());
-
+async function getSwapTokenUSDValue(amountBN, tokenPrice, tokenAddress, provider) {
   // get the decimal scaling for this token
-  // calling .decimals() may fail for a vyper contract
   const contract = new ethers.Contract(tokenAddress, DECIMALS_ABI, provider);
-  const decimals = await contract.decimals();
+  let decimals;
+  try {
+    // calling .decimals() may fail for a vyper contract
+    decimals = await contract.decimals();
+  }
+  catch {
+    return undefined;
+  }
   const denominator = (new BigNumber(10)).pow(decimals);
 
   // multiply by the price and divide out decimal places
@@ -85,17 +92,29 @@ function provideHandleTransaction(data) {
         // uniswap v3
         const poolContract = new ethers.Contract(address, poolAbi, provider);
 
-        const token0 = await poolContract.token0();
-        const token1 = await poolContract.token1();
-        const fee = await poolContract.fee();
+        let token0;
+        let token1;
+        try {
+          // get the tokens and fee that define the Uniswap V3 pool
+          token0 = await poolContract.token0();
+          token1 = await poolContract.token1();
+          const fee = await poolContract.fee();
 
-        // for the given tokens and fee, get the correlated pool address from the factory contract
-        const expectedAddress = await data.factoryContract.getPool(token0, token1, fee);
+          // for the given tokens and fee, get the correlated pool address from the factory contract
+          const expectedAddress = await factoryContract.getPool(token0, token1, fee);
 
-        // if the contract addresses do not match, this is not a uniswap v3 pool
-        if (address.toLowerCase() !== expectedAddress.toLowerCase()) {
+          if (address.toLowerCase() !== expectedAddress.toLowerCase()) {
+            // if the contract addresses do not match, this is not a uniswap v3 pool
+            return undefined;
+          }
+        }
+        catch {
+          // if an error was encountered calling contract methods
+          // assume that this is not a Uniswap V3 Pool
           return undefined;
         }
+
+        const tokenPrices = await getTokenPrices(token0, token1);
 
         // parse the information from the flash swap
         const {
@@ -120,13 +139,27 @@ function provideHandleTransaction(data) {
         };
 
         if (amount0BN.gt(0)) {
-          const token0Value = await getAmountValue(amount0BN, token0, provider);
-          flashSwapInfo.token0EquivalentUSD = flashSwapInfo.token0EquivalentUSD.plus(token0Value);
+          const token0Value = await getSwapTokenUSDValue(
+            amount0BN,
+            tokenPrices.token0Price,
+            token0,
+            provider
+          );
+          if (token0Value !== undefined) {
+            flashSwapInfo.token0EquivalentUSD = flashSwapInfo.token0EquivalentUSD.plus(token0Value);
+          }
         }
 
         if (amount1BN.gt(0)) {
-          const token1Value = await getAmountValue(amount1BN, token1, provider);
-          flashSwapInfo.token1EquivalentUSD = flashSwapInfo.token1EquivalentUSD.plus(token1Value);
+          const token1Value = await getSwapTokenUSDValue(
+            amount1BN,
+            tokenPrices.token1Price,
+            token1,
+            provider
+          );
+          if (token1Value !== undefined) {
+            flashSwapInfo.token1EquivalentUSD = flashSwapInfo.token1EquivalentUSD.plus(token1Value);
+          }
         }
 
         return flashSwapInfo;

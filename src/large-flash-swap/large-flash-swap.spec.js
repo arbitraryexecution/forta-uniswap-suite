@@ -1,7 +1,3 @@
-const {
-  Finding, FindingType, FindingSeverity, createTransactionEvent,
-} = require('forta-agent');
-
 const BigNumber = require('bignumber.js');
 
 /* ethers mocking */
@@ -20,14 +16,18 @@ const mockContract = {
 };
 
 // combine the mocked provider and contracts into the ethers import mock
-jest.mock('ethers', () => ({
-  ...jest.requireActual('ethers'),
-  providers: {
-    JsonRpcBatchProvider: jest.fn(),
+jest.mock('forta-agent', () => ({
+  ...jest.requireActual('forta-agent'),
+  getEthersProvider: jest.fn(),
+  ethers: {
+    ...jest.requireActual('ethers'),
+    providers: {
+      JsonRpcBatchProvider: jest.fn(),
+    },
+    Contract: jest.fn().mockReturnValue(mockContract),
   },
-  Contract: jest.fn().mockReturnValue(mockContract),
 }));
-const ethers = require('ethers');
+const { Finding, FindingType, FindingSeverity, ethers, TransactionEvent } = require('forta-agent');
 
 /* axios mocking */
 const mockCoinGeckoData = {};
@@ -45,9 +45,10 @@ mockContract.interface = new ethers.utils.Interface(utils.getAbi('UniswapV3Pool'
 
 const { createLog } = require('../event-utils');
 
-const poolCreatedTopic = '0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118';
-const flashSwapTopic = '0xbdbdb71d7860376ba52b25a5028beea23581364a40522f6bcfb86bb1f2dca633';
-const EVEREST_ID = '0xa2e07f422b5d7cbbfca764e53b251484ecf945fa';
+const poolCreatedTopic = ethers.utils.id('PoolCreated(address,address,uint24,int24,address)');
+const flashSwapTopic = ethers.utils.id('Flash(address,address,uint256,uint256,uint256,uint256)');
+
+const { EVEREST_ID } = require('../../agent-config.json');
 
 /* handler import */
 // import the handler code after the mocked modules have been defined
@@ -111,6 +112,9 @@ describe('large flash swap monitoring', () => {
       // initialize the handler
       // this will create the mock provider and mock factory contract
       await (provideInitialize(initializeData))();
+
+      initializeData.factoryContract = mockContract;
+
       handleTransaction = provideHandleTransaction(initializeData);
     });
 
@@ -118,8 +122,7 @@ describe('large flash swap monitoring', () => {
       const receipt = {
         logs: logsNoMatchEvent,
       };
-      const addresses = { '0x1': true };
-      const txEvent = createTransactionEvent({ receipt, addresses });
+      const txEvent = new TransactionEvent(null, null, null, receipt, [], [], null);
 
       const findings = await handleTransaction(txEvent);
 
@@ -132,8 +135,7 @@ describe('large flash swap monitoring', () => {
       const receipt = {
         logs: logsMatchFlashSwapEventInvalidAddress,
       };
-      const addresses = { '0x1': true };
-      const txEvent = createTransactionEvent({ receipt, addresses });
+      const txEvent = new TransactionEvent(null, null, null, receipt, [], [], null);
 
       const findings = await handleTransaction(txEvent);
 
@@ -151,9 +153,7 @@ describe('large flash swap monitoring', () => {
       const receipt = {
         logs: logsMatchFlashSwapEventAddressMatch,
       };
-      const addresses = {};
-      addresses[mockPoolAddress] = true;
-      const txEvent = createTransactionEvent({ receipt, addresses });
+      const txEvent = new TransactionEvent(null, null, null, receipt, [], [], null);
 
       // set up the mocked response from axios to return the price of the token
       // intentionally set the price low enough that the threshold is not exceeded
@@ -167,6 +167,7 @@ describe('large flash swap monitoring', () => {
       // set up the coin gecko response to return a value that will not cause a finding
       mockCoinGeckoResponse.data = {};
       mockCoinGeckoResponse.data[mockToken0Address.toLowerCase()] = { usd: usdPricePerTokenNum };
+      mockCoinGeckoResponse.data[mockToken1Address.toLowerCase()] = { usd: usdPricePerTokenNum };
 
       // this will determine that the FlashSwap included an amount of 256 tokens of token0
       const findings = await handleTransaction(txEvent);
@@ -187,9 +188,7 @@ describe('large flash swap monitoring', () => {
       const receipt = {
         logs: logsMatchFlashSwapEventAddressMatch,
       };
-      const addresses = {};
-      addresses[mockPoolAddress] = true;
-      const txEvent = createTransactionEvent({ receipt, addresses });
+      const txEvent = new TransactionEvent(null, null, null, receipt, [], [], null);
 
       // set up the mocked response from axios to return the price of the token
       // intentionally set the price just over the threshold for a finding
@@ -203,6 +202,7 @@ describe('large flash swap monitoring', () => {
       // set up the coin gecko response to the appropriate price to cause a finding
       mockCoinGeckoResponse.data = {};
       mockCoinGeckoResponse.data[mockToken0Address.toLowerCase()] = { usd: usdPricePerTokenNum };
+      mockCoinGeckoResponse.data[mockToken1Address.toLowerCase()] = { usd: usdPricePerTokenNum };
 
       // this will determine that the FlashSwap included an amount of 256 tokens of token0
       const findings = await handleTransaction(txEvent);

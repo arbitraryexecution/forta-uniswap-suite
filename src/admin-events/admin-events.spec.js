@@ -1,6 +1,5 @@
-const ethers = require('ethers');
 const {
-  Finding, FindingType, FindingSeverity, createTransactionEvent,
+  Finding, FindingType, FindingSeverity, createTransactionEvent, ethers,
 } = require('forta-agent');
 
 const { provideHandleTransaction, provideInitialize } = require('./admin-events');

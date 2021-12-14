@@ -1,4 +1,4 @@
-const ethers = require('ethers');
+const { ethers } = require('forta-agent');
 
 const contractAddresses = require('../contract-addresses.json');
 
