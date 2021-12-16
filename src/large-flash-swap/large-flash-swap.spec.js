@@ -27,7 +27,9 @@ jest.mock('forta-agent', () => ({
     Contract: jest.fn().mockReturnValue(mockContract),
   },
 }));
-const { Finding, FindingType, FindingSeverity, ethers, TransactionEvent } = require('forta-agent');
+const {
+  Finding, FindingType, FindingSeverity, ethers, TransactionEvent,
+} = require('forta-agent');
 
 /* axios mocking */
 const mockCoinGeckoData = {};
@@ -105,8 +107,6 @@ describe('large flash swap monitoring', () => {
       // initialize the handler
       // this will create the mock provider and mock factory contract
       await (provideInitialize(initializeData))();
-
-      initializeData.factoryContract = mockContract;
 
       handleTransaction = provideHandleTransaction(initializeData);
     });

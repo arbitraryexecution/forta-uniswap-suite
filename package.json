@@ -19,7 +19,6 @@
   "dependencies": {
     "axios": "^0.24.0",
     "bignumber.js": "^9.0.1",
-    "ethers": "^5.4.6",
     "forta-agent": "^0.0.32"
   },
   "devDependencies": {

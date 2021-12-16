@@ -56,8 +56,7 @@ async function getSwapTokenUSDValue(amountBN, tokenPrice, tokenAddress, provider
   try {
     // calling .decimals() may fail for a vyper contract
     decimals = await contract.decimals();
-  }
-  catch {
+  } catch {
     return undefined;
   }
   const denominator = (new BigNumber(10)).pow(decimals);
@@ -107,8 +106,7 @@ function provideHandleTransaction(data) {
             // if the contract addresses do not match, this is not a uniswap v3 pool
             return undefined;
           }
-        }
-        catch {
+        } catch {
           // if an error was encountered calling contract methods
           // assume that this is not a Uniswap V3 Pool
           return undefined;
@@ -143,7 +141,7 @@ function provideHandleTransaction(data) {
             amount0BN,
             tokenPrices.token0Price,
             token0,
-            provider
+            provider,
           );
           if (token0Value !== undefined) {
             flashSwapInfo.token0EquivalentUSD = flashSwapInfo.token0EquivalentUSD.plus(token0Value);
@@ -155,7 +153,7 @@ function provideHandleTransaction(data) {
             amount1BN,
             tokenPrices.token1Price,
             token1,
-            provider
+            provider,
           );
           if (token1Value !== undefined) {
             flashSwapInfo.token1EquivalentUSD = flashSwapInfo.token1EquivalentUSD.plus(token1Value);
