@@ -1,7 +1,7 @@
 const {
   Finding, FindingSeverity, FindingType, ethers, getEthersProvider,
 } = require('forta-agent');
-const { getAbi, filterAndParseLogs } = require('../common');
+const { getAbi } = require('../common');
 
 // load any agent configuration parameters
 const config = require('../../agent-config.json');
@@ -10,6 +10,15 @@ const config = require('../../agent-config.json');
 const contractAddresses = require('../../contract-addresses.json');
 
 const addressList = Object.values(contractAddresses).map((item) => item.address.toLowerCase());
+
+// define events of interest to watch
+const EVENTS = [
+  'event MinterChanged(address minter, address newMinter)',
+  'event NewAdmin(address indexed newAdmin)',
+  'event OwnerChanged(address oldOwner, address newOwner)',
+  'event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)',
+  'event AdminChanged(address previousAdmin, address newAdmin)',
+];
 
 // set up a variable to hold initialization data used in the handler
 const initializeData = {};
@@ -110,10 +119,7 @@ function provideHandleTransaction(data) {
 
     // check if this tx changed any of the admins
     contracts.forEach((contract) => {
-      const parsedLogs = filterAndParseLogs(
-        txEvent.logs, contract.address.toLowerCase(), contract.interface,
-        ['MinterChanged', 'NewAdmin', 'OwnerChanged', 'OwnershipTransferred', 'AdminChanged'],
-      );
+      const parsedLogs = txEvent.filterLog(EVENTS, contract.address);
       data.check = data.check || (parsedLogs.length > 0);
     });
 

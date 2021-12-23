@@ -131,10 +131,8 @@ describe('admin event monitoring', () => {
           contractName: 'UniswapV3Factory',
           contractAddress: '0x1F98431c8aD98523631AE4a59f267346ea31F984',
           eventName: 'OwnerChanged',
-          eventArgs: {
-            oldOwner: '0x0000000000000000000000000000000000000001',
-            newOwner: '0x0000000000000000000000000000000000000002',
-          },
+          oldOwner: '0x0000000000000000000000000000000000000001',
+          newOwner: '0x0000000000000000000000000000000000000002',
         },
       })];
 
