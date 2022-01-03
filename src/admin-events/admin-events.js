@@ -1,7 +1,7 @@
 const {
   Finding, FindingSeverity, FindingType, ethers,
 } = require('forta-agent');
-const { getAbi, filterAndParseLogs, extractEventArgs } = require('../common');
+const { getAbi, extractEventArgs } = require('../common');
 
 // load any agent configuration parameters
 const config = require('../../agent-config.json');
@@ -13,12 +13,40 @@ const contractAddresses = require('../../contract-addresses.json');
 const initializeData = {};
 
 // get the Array of events for a given contract
-function getEvents(contractName, adminEvents) {
-  const events = adminEvents[contractName];
+function getEvents(currContract, adminEvents, contracts) {
+  let events = adminEvents[currContract.name];
+  const eventSignatures = [];
   if (events === undefined) {
     return {}; // no events for this contract
   }
-  return events;
+
+  const eventNames = Object.keys(events);
+  if (events.Proxy) {
+    // contract is a proxy, look up the events (if any) for the contract the proxy is pointing to
+    const proxyName = events.Proxy;
+    const proxyEvents = Object.keys(adminEvents[proxyName]);
+    if (proxyEvents) {
+      events = { ...events, ...adminEvents[proxyName] };
+
+      // find the abi for the contract the proxy is pointing to and get the event signatures
+      const [proxiedContract] = contracts.filter((contract) => proxyName === contract.name);
+      proxyEvents.forEach((eventName) => {
+        eventSignatures.push(
+          proxiedContract.iface.getEvent(eventName).format(ethers.utils.FormatTypes.full),
+        );
+      });
+    }
+  }
+
+  eventNames.forEach((eventName) => {
+    if (eventName !== 'Proxy') {
+      eventSignatures.push(
+        currContract.iface.getEvent(eventName).format(ethers.utils.FormatTypes.full),
+      );
+    }
+  });
+
+  return { events, eventSignatures };
 }
 
 // helper function to create alerts
@@ -46,7 +74,7 @@ function createAlert(
       contractName,
       contractAddress,
       eventName,
-      eventArgs,
+      ...eventArgs,
     },
   });
 }
@@ -102,16 +130,10 @@ function provideHandleTransaction(data) {
     // iterate over each contract name to get the address and events
     contracts.forEach((contract) => {
       // for each contract look up the events of interest
-      const events = getEvents(contract.name, adminEvents);
-      const eventNames = Object.keys(events);
+      const { events, eventSignatures } = getEvents(contract, adminEvents, contracts);
 
       // filter down to only the events we want to alert on
-      const parsedLogs = filterAndParseLogs(
-        txEvent.logs,
-        contract.address.toLowerCase(),
-        contract.iface,
-        eventNames,
-      );
+      const parsedLogs = txEvent.filterLog(eventSignatures, contract.address);
 
       // alert on each item in parsedLogs
       parsedLogs.forEach((parsedLog) => {

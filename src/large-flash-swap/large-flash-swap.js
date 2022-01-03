@@ -13,7 +13,8 @@ const config = require('../../agent-config.json');
 const utils = require('../utils');
 
 const DECIMALS_ABI = ['function decimals() view returns (uint8)'];
-const FLASH_SIGNATURE = 'Flash(address,address,uint256,uint256,uint256,uint256)';
+const FLASH_SIGNATURE = 'event Flash(address indexed sender, address indexed recipient, '
++ 'uint256 amount0, uint256 amount1, uint256 paid0, uint256 paid1)';
 
 // set up a variable to hold initialization data used in the handler
 const initializeData = {};
@@ -81,11 +82,13 @@ function provideHandleTransaction(data) {
 
     // check for flash swaps on any addresses
     // if there are any matches, check against the array of pool addresses
-    const flashSwaps = txEvent.filterEvent(FLASH_SIGNATURE);
+    const flashSwaps = txEvent.filterLog(FLASH_SIGNATURE);
 
     if (flashSwaps.length > 0) {
       const flashSwapPromises = flashSwaps.map(async (flashSwapEvent) => {
-        const { address, data: eventData, topics } = flashSwapEvent;
+        // parse the information from the flash swap
+        const { address } = flashSwapEvent;
+        const { sender, amount0, amount1 } = flashSwapEvent.args;
 
         // check the flash swap against the factory contract to verify that it belongs to
         // uniswap v3
@@ -113,15 +116,6 @@ function provideHandleTransaction(data) {
         }
 
         const tokenPrices = await getTokenPrices(token0, token1);
-
-        // parse the information from the flash swap
-        const {
-          args: {
-            sender,
-            amount0,
-            amount1,
-          },
-        } = poolContract.interface.parseLog({ data: eventData, topics });
 
         // convert from ethers.js bignumber to bignumber.js
         const amount0BN = new BigNumber(amount0.toHexString());

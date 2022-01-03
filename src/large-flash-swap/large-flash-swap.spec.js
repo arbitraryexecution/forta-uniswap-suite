@@ -78,19 +78,20 @@ describe('large flash swap monitoring', () => {
     const logsNoMatchEvent = [{ topics: [poolCreatedTopic] }];
 
     // log that matches a FlashSwap event from a non-uniswap address
-    const logsMatchFlashSwapEventInvalidAddress = [
-      {
-        address: '0xINVALIDUNISWAPV3POOLADDRESS',
-        topics: [
-          flashSwapTopic,
-        ],
-      },
-    ];
-
-    // log that matches a FlashSwap event from a uniswap v3 pool address
     const amount0 = 100;
     const amount0Hex64 = amount0.toString(16).padStart(64, '0');
     const hashZero = (ethers.constants.HashZero).slice(2);
+    const logsMatchFlashSwapEventInvalidAddress = [{
+      address: '0xINVALIDUNISWAPV3POOLADDRESS',
+      topics: [
+        flashSwapTopic,
+        ethers.constants.HashZero,
+        ethers.constants.HashZero,
+      ],
+      data: `0x${amount0Hex64}${hashZero}${hashZero}${hashZero}`,
+    }];
+
+    // log that matches a FlashSwap event from a uniswap v3 pool address
     const logsMatchFlashSwapEventAddressMatch = [{
       address: '0xFAKEPOOLADDRESS',
       topics: [

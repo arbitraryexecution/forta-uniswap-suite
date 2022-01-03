@@ -19,7 +19,7 @@
   "dependencies": {
     "axios": "^0.24.0",
     "bignumber.js": "^9.0.1",
-    "forta-agent": "^0.0.32"
+    "forta-agent": "^0.0.33"
   },
   "devDependencies": {
     "eslint": "^7.32.0",
