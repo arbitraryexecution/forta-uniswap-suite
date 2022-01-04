@@ -123,7 +123,6 @@ function provideHandleTransaction(data) {
           return findings;
         }
 
-
         // convert from ethers.js bignumber to bignumber.js
         const amount0BN = new BigNumber(amount0.toHexString());
         const amount1BN = new BigNumber(amount1.toHexString());
