@@ -41,18 +41,18 @@ jest.mock('axios', () => ({
 }));
 const axios = require('axios');
 
-const utils = require('../utils');
+const utils = require('./utils');
 
 mockContract.interface = new ethers.utils.Interface(utils.getAbi('UniswapV3Pool'));
 
 const poolCreatedTopic = ethers.utils.id('PoolCreated(address,address,uint24,int24,address)');
 const flashSwapTopic = ethers.utils.id('Flash(address,address,uint256,uint256,uint256,uint256)');
 
-const { EVEREST_ID } = require('../../agent-config.json');
+const { EVEREST_ID } = require('../agent-config.json');
 
 /* handler import */
 // import the handler code after the mocked modules have been defined
-const { provideHandleTransaction, provideInitialize } = require('./large-flash-swap');
+const { provideHandleTransaction, provideInitialize } = require('./agent');
 
 /* axios mock test */
 describe('mock axios GET requests', () => {

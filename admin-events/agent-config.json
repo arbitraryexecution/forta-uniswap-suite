@@ -1,0 +1,38 @@
+{
+  "EVEREST_ID": "0xa2e07f422b5d7cbbfca764e53b251484ecf945fa",
+  "PROTOCOL_NAME": "Uniswap V3",
+  "PROTOCOL_ABBREVIATION": "UNISWAPV3",
+  "adminEvents": {
+    "UniswapV3Factory": {
+      "PoolCreated": { "type": "Info", "severity": "Info" },
+      "OwnerChanged": { "type": "Suspicious", "severity": "High" },
+      "FeeAmountEnabled": { "type": "Info", "severity": "Info" }
+    },
+    "ProxyAdmin": {
+      "OwnershipTransferred": { "type": "Suspicious", "severity": "High" }
+    },
+    "NonfungibleTokenPositionDescriptor": {
+      "UpdateTokenRatioPriority": { "type": "Info", "severity": "Info" }
+    },
+    "TransparentUpgradableProxy": {
+      "Proxy": "NonfungibleTokenPositionDescriptor"
+    },
+    "GovernorBravo": {
+       "NewAdmin": { "type": "Suspicous", "severity": "Medium" },
+       "NewPendingAdmin": { "type": "Suspicious", "severity": "Medium" },
+       "NewImplementation": { "type": "Suspicious", "severity": "Medium" },
+       "ProposalCreated": { "type": "Info", "severity": "Info" },
+       "ProposalExecuted": { "type": "Info", "severity": "Info" },
+       "ProposalCanceled": { "type": "Info", "severity": "Info" },
+       "ProposalThresholdSet": { "type": "Info", "severity": "Info" },
+       "VotingDelaySet":  { "type": "Info", "severity": "Info" },
+       "VotingPeriodSet": { "type": "Info", "severity": "Info" }
+    },
+    "Uni": {
+      "MinterChanged": { "type": "Suspicioius", "severity": "High" }
+    }
+  },
+  "largeFlashSwap": {
+    "thresholdUSD": 100000
+  }
+}

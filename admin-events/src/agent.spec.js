@@ -2,7 +2,7 @@ const {
   Finding, FindingType, FindingSeverity, createTransactionEvent, ethers,
 } = require('forta-agent');
 
-const { provideHandleTransaction, provideInitialize } = require('./admin-events');
+const { provideHandleTransaction, provideInitialize } = require('./agent');
 
 // retrieve a contract by name from the list of initialized contracts
 function getContractByName(contracts, name) {

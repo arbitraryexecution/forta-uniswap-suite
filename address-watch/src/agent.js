@@ -1,13 +1,13 @@
 const {
   Finding, FindingSeverity, FindingType, ethers, getEthersProvider,
 } = require('forta-agent');
-const { getAbi } = require('../common');
+const { getAbi } = require('./common');
 
 // load any agent configuration parameters
-const config = require('../../agent-config.json');
+const config = require('../agent-config.json');
 
 // load contract and oracle addresses
-const contractAddresses = require('../../contract-addresses.json');
+const contractAddresses = require('../contract-addresses.json');
 
 const addressList = Object.values(contractAddresses).map((item) => item.address.toLowerCase());
 
