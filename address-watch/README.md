@@ -4,7 +4,7 @@ Forta agent suite to monitor Uniswap V3.
 
 ## Description
 
-This agent monitors various aspects of Uniswap V3.  The suite currently contains
+This suite monitors various aspects of Uniswap V3 and currently contains
 the following handlers:
 
  - admin-events
