@@ -1,13 +1,13 @@
 const {
   Finding, FindingSeverity, FindingType, ethers,
 } = require('forta-agent');
-const { getAbi, extractEventArgs } = require('../common');
+const { getAbi, extractEventArgs } = require('./common');
 
 // load any agent configuration parameters
-const config = require('../../agent-config.json');
+const config = require('../agent-config.json');
 
 // load contract addresses
-const contractAddresses = require('../../contract-addresses.json');
+const contractAddresses = require('../contract-addresses.json');
 
 // set up a variable to hold initialization data used in the handler
 const initializeData = {};

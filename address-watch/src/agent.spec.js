@@ -2,8 +2,8 @@ const {
   Finding, FindingType, FindingSeverity, createTransactionEvent, ethers,
 } = require('forta-agent');
 
-const { provideHandleTransaction, provideInitialize, getAbi } = require('./address-watch');
-const { Uni } = require('../../contract-addresses.json');
+const { provideHandleTransaction, provideInitialize, getAbi } = require('./agent');
+const { Uni } = require('../contract-addresses.json');
 
 const uniAddress = Uni.address;
 

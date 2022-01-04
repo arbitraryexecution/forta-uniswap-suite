@@ -8,9 +8,9 @@ const {
 } = require('forta-agent');
 
 // load any agent configuration parameters
-const config = require('../../agent-config.json');
+const config = require('../agent-config.json');
 
-const utils = require('../utils');
+const utils = require('./utils');
 
 const DECIMALS_ABI = ['function decimals() view returns (uint8)'];
 const FLASH_SIGNATURE = 'event Flash(address indexed sender, address indexed recipient, '
