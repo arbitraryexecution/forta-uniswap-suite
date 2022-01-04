@@ -4,4 +4,4 @@ forta.config.json
 .env
 *.swp
 *.orig
-
+publish.log

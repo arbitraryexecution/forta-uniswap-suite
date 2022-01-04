@@ -115,7 +115,13 @@ function provideHandleTransaction(data) {
           return undefined;
         }
 
-        const tokenPrices = await getTokenPrices(token0, token1);
+        let tokenPrices;
+        try{
+          tokenPrices = await getTokenPrices(token0, token1);
+        } catch {
+          // coingecko call may fail
+          return findings;
+        }
 
         // convert from ethers.js bignumber to bignumber.js
         const amount0BN = new BigNumber(amount0.toHexString());
