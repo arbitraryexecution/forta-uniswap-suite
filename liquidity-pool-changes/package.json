@@ -23,6 +23,7 @@
     "forta-agent": "^0.0.39"
   },
   "devDependencies": {
+    "eslint": "^8.10.0",
     "jest": "^27.0.6",
     "nodemon": "^2.0.8"
   }
