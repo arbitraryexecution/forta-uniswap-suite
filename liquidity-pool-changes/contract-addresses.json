@@ -2,5 +2,9 @@
   "UniswapV3Factory": {
     "address": "0x1F98431c8aD98523631AE4a59f267346ea31F984",
     "abiFile": "UniswapV3Factory.json" 
+  },
+  "Usdc/EthPool": {
+    "address": "0x8ad599c3A0ff1De082011EFDDc58f1908eb6e6D8",
+    "abiFile": "UniswapV3Pool.json"
   }
 }

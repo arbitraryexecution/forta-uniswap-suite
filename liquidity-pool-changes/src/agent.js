@@ -3,11 +3,11 @@ const {
   Finding,
   FindingSeverity,
   FindingType,
-  getJsonRpcUrl,
   ethers,
   getEthersProvider,
 } = require("forta-agent");
 
+// load agent configurations
 const config = require("../agent-config.json");
 
 const utils = require("./utils");
@@ -28,6 +28,7 @@ function provideInitialize(data) {
 
     // get abi
     data.poolAbi = utils.getAbi("UniswapV3Pool.json");
+    data.erc20Abi = utils.getAbi("ERC20.json");
 
     // get liquidityThresholdPercentChange
     data.liquidityThresholdPercentChange = new BigNumber(
@@ -36,22 +37,37 @@ function provideInitialize(data) {
   };
 }
 
+// keep state of liquidity during previous block
+let previousLiquidity;
+
 function provideHandleBlock(data) {
   return async function handleBlock(blockEvent) {
+    // destructure params from initialized data
     const {
       poolAbi,
+      erc20Abi,
       provider,
       factoryContract,
       everestId,
       liquidityThresholdPercentChange,
     } = data;
 
-    // factory contract creates each factory pool
-    // first you want to get the factory pool that you want to scan for
+    // make sure that data is initialized first
+    if (!provider) throw new Error("handleBlock called before initialization");
+
+    let poolContract = utils.getContract("Usdc/EthPool", provider);
+    let token0Address = await poolContract.functions.token0();
+    let token1Address = await poolContract.functions.token1();
+
+    let token0Contract = new ethers.Contract(token0Address, erc20Abi, provider);
+    let token1Contract = new ethers.Contract(token1Address, erc20Abi, provider);
+
+    token0Contract = token0Contract.attach(token0Address);
+    token1Contract = token1Contract.attatch(token1Address);
+
+    // get a block and filter it through to test it out
   };
 }
-
-function handleBlock(blockEvent) {}
 
 // helper function to create alerts
 function createAlert() {}
