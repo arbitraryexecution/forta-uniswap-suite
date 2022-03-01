@@ -1,39 +1,64 @@
 const BigNumber = require("bignumber.js");
-const { Finding, FindingSeverity, FindingType } = require("forta-agent");
+const {
+  Finding,
+  FindingSeverity,
+  FindingType,
+  getJsonRpcUrl,
+  ethers,
+  getEthersProvider,
+} = require("forta-agent");
 
-let findingsCount = 0;
+const config = require("../agent-config.json");
 
-const handleTransaction = async (txEvent) => {
-  const findings = [];
+const utils = require("./utils");
 
-  // limiting this agent to emit only 5 findings so that the alert feed is not spammed
-  if (findingsCount >= 5) return findings;
+// used to store initialization data once you pass it into the provideHandleBlock() function
+const initializeData = {};
 
-  // create finding if gas used is higher than threshold
-  const gasUsed = new BigNumber(txEvent.gasUsed);
-  if (gasUsed.isGreaterThan("1000000")) {
-    findings.push(
-      Finding.fromObject({
-        name: "High Gas Used",
-        description: `Gas Used: ${gasUsed}`,
-        alertId: "FORTA-1",
-        severity: FindingSeverity.Medium,
-        type: FindingType.Suspicious,
-      })
+// use this function to setup all your data. You'll run it as an immediately invoked function to fill your initlaizeData object
+function provideInitialize(data) {
+  return async function initialize() {
+    data.everestId = config.EVEREST_ID;
+
+    // setup ethers.js provider to interact with contracts
+    data.provider = getEthersProvider();
+
+    // get contract factory
+    data.factoryContract = utils.getContract("UniswapV3Factory", data.provider);
+
+    // get abi
+    data.poolAbi = utils.getAbi("UniswapV3Pool.json");
+
+    // get liquidityThresholdPercentChange
+    data.liquidityThresholdPercentChange = new BigNumber(
+      config.liquidityThresholdPercentChange
     );
-    findingsCount++;
-  }
+  };
+}
 
-  return findings;
-};
+function provideHandleBlock(data) {
+  return async function handleBlock(blockEvent) {
+    const {
+      poolAbi,
+      provider,
+      factoryContract,
+      everestId,
+      liquidityThresholdPercentChange,
+    } = data;
 
-// const handleBlock = async (blockEvent) => {
-//   const findings = [];
-//   // detect some block condition
-//   return findings;
-// };
+    // factory contract creates each factory pool
+    // first you want to get the factory pool that you want to scan for
+  };
+}
+
+function handleBlock(blockEvent) {}
+
+// helper function to create alerts
+function createAlert() {}
 
 module.exports = {
-  handleTransaction,
-  // handleBlock,
+  provideInitialize,
+  initialize: provideInitialize(initializeData),
+  provideHandleBlock,
+  handleBlock: provideHandleBlock(initializeData),
 };

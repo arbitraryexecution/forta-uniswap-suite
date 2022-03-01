@@ -2,39 +2,41 @@ const {
   FindingType,
   FindingSeverity,
   Finding,
-  createTransactionEvent,
+  createBlockEvent,
 } = require("forta-agent");
-const { handleTransaction } = require("./agent");
 
-describe("high gas agent", () => {
-  const createTxEventWithGasUsed = (gasUsed) =>
-    createTransactionEvent({
-      receipt: { gasUsed },
-    });
+const config = require("../agent-config.json")
 
-  describe("handleTransaction", () => {
-    it("returns empty findings if gas used is below threshold", async () => {
-      const txEvent = createTxEventWithGasUsed("1");
+const { provideHandleBlock, provideInitialize } = require("./agent");
 
-      const findings = await handleTransaction(txEvent);
+describe("large liquidity pool change agent", () => {
+  // create a block event that changes liquiidty
+  let initializeData;
+  let handleBlock;
 
-      expect(findings).toStrictEqual([]);
+  beforeEach(async () => {
+    initializeData = {}
+
+    await (provideInitialize(initializeData))();
+
+    handleBlock = provideHandleBlock(initializeData);
+
+  })
+
+  describe("setup data", () => {
+    it("should initialize data", async() => {
+      expect(initializeData.everestId).toEqual(config.EVEREST_ID);
+    })
+  })
+
+  describe("handleBlock", () => {
+    it("returns empty findings if liquidity change is below threshold", async () => {
+      // mock a block event that doesn't produce a 10% change in liquidity
     });
 
     it("returns a finding if gas used is above threshold", async () => {
-      const txEvent = createTxEventWithGasUsed("1000001");
-
-      const findings = await handleTransaction(txEvent);
-
-      expect(findings).toStrictEqual([
-        Finding.fromObject({
-          name: "High Gas Used",
-          description: `Gas Used: ${txEvent.gasUsed}`,
-          alertId: "FORTA-1",
-          type: FindingType.Suspicious,
-          severity: FindingSeverity.Medium,
-        }),
-      ]);
+      // mock a block event that produces a change in liquidity over 10%
     });
+
   });
 });
