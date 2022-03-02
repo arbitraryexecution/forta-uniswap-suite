@@ -36,7 +36,7 @@ function provideInitialize(data) {
 
     // get liquidityThresholdPercentChange
     data.liquidityThresholdPercentChange = new BigNumber(
-      config.liquidityThresholdPercentChange
+      config.largeLiquidityChange.liquidityThresholdPercentChange
     );
   };
 }
@@ -62,8 +62,16 @@ function provideHandleBlock(data) {
     const findings = [];
 
     let poolContract = utils.getContract("Usdc/EthPool", provider);
-    let token0Address = await poolContract.token0();
-    let token1Address = await poolContract.token1();
+
+    let token0Address;
+    let token1Address;
+    try {
+      token0Address = await poolContract.token0();
+      token1Address = await poolContract.token1();
+    } catch {
+      // asume its not a Uniswap V3 pool if contract calls fail
+      return undefined
+    }
 
     let token0Contract = new ethers.Contract(token0Address, erc20Abi, provider);
     let token1Contract = new ethers.Contract(token1Address, erc20Abi, provider);
@@ -85,7 +93,14 @@ function provideHandleBlock(data) {
     let poolEthBalanceBN = new BigNumber(poolEthBalance.toHexString());
 
     // this returns the token prices in usd of each token (without accounting for decimals)
-    let tokenPrices = await getTokenPrices(token0Address, token1Address);
+    let tokenPrices;
+    try {
+      tokenPrices = await getTokenPrices(token0Address, token1Address);
+    } catch {
+      // if coingecko call fails
+      return findings;
+    }
+    
 
     // multiply the amount of tokens in the pool by usd value, adjusting for decimals
     let token0ValueUSD;
@@ -110,21 +125,24 @@ function provideHandleBlock(data) {
       );
     }
 
+    let stuff = token1ValueUSD + token0ValueUSD
+    console.log(stuff.toString())
+
     // calculate the total liquidity value of the pool at current block
     if (token0ValueUSD !== undefined && token1ValueUSD !== undefined) {
       counter === 0
-        ? (previousLiquidity = token0ValueUSD.times(token1ValueUSD))
-        : (currentLiquidity = token0ValueUSD.times(token1ValueUSD));
+        ? (previousLiquidity = token0ValueUSD + token1ValueUSD)
+        : (currentLiquidity = token0ValueUSD + token1ValueUSD);
     } else if (token0ValueUSD !== undefined && poolEthBalanceBN.gt(0)) {
       counter === 0
-        ? (previousLiquidity = token0ValueUSD.times(poolEthBalanceBN))
-        : (currentLiquidity = token0ValueUSD.times(poolEthBalanceBN));
+        ? (previousLiquidity = token0ValueUSD + poolEthBalanceBN)
+        : (currentLiquidity = token0ValueUSD + poolEthBalanceBN);
     } else if (token1ValueUSD !== undefined && poolEthBalanceBN.get(0)) {
       counter === 0
-        ? (previousLiquidity = token1ValueUSD.times(poolEthBalanceBN))
-        : (currentLiquidity = token1ValueUSD.times(poolEthBalanceBN));
+        ? (previousLiquidity = token1ValueUSD + poolEthBalanceBN)
+        : (currentLiquidity = token1ValueUSD + poolEthBalanceBN);
     }
-
+    
     counter = 1;
 
     // return no findings the first time this agent is ran
@@ -133,10 +151,17 @@ function provideHandleBlock(data) {
     }
 
     // create findings if currentLiquidity - prevLiquidity > 10%
-
-
+    if (
+      (currentLiquidity - previousLiquidity) / previousLiquidity >
+      liquidityThresholdPercentChange
+    ) {
+      const finding = Finding.fromObject({
+        name: "Uniswap V3 Large Change in Liquidity",
+        description: `Large change in liquidity from pool ${poolContract.address}`
+      })
+    }
     // set previous liquidity value so its accurate the next time this agent runs on the next block
-    previousLiquidity = currentLiquidity
+    previousLiquidity = currentLiquidity;
 
     return findings;
   };
