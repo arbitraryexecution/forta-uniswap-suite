@@ -12,3 +12,5 @@ Describe each of the type of alerts fired by this agent
   - Fired when ...
 
 ## Test Data
+
+- When inputting the threshold percent into your agent-config.json, it is suggested to input the value as a string

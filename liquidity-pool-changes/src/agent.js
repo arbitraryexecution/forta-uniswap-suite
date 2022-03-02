@@ -27,11 +27,7 @@ function provideInitialize(data) {
     // setup ethers.js provider to interact with contracts
     data.provider = getEthersProvider();
 
-    // get contract factory
-    data.factoryContract = utils.getContract("UniswapV3Factory", data.provider);
-
     // get abi
-    data.poolAbi = utils.getAbi("UniswapV3Pool.json");
     data.erc20Abi = utils.getAbi("ERC20.json");
 
     // get liquidityThresholdPercentChange
@@ -46,12 +42,9 @@ let counter = 0; // to instantiate the first previousLiquidity amount the first 
 
 function provideHandleBlock(data) {
   return async function handleBlock(blockEvent) {
-    // destructure params from initialized data
     const {
-      poolAbi,
       erc20Abi,
       provider,
-      factoryContract,
       everestId,
       liquidityThresholdPercentChange,
     } = data;
@@ -61,7 +54,7 @@ function provideHandleBlock(data) {
 
     const findings = [];
 
-    let poolContract = utils.getContract("Usdc/EthPool", provider);
+    const poolContract = utils.getContract("Usdc/Eth", provider);
 
     let token0Address;
     let token1Address;
@@ -70,27 +63,23 @@ function provideHandleBlock(data) {
       token1Address = await poolContract.token1();
     } catch {
       // asume its not a Uniswap V3 pool if contract calls fail
-      return undefined
+      return undefined;
     }
 
-    let token0Contract = new ethers.Contract(token0Address, erc20Abi, provider);
-    let token1Contract = new ethers.Contract(token1Address, erc20Abi, provider);
-
-    // attatch erc20 methods so you can check the erc20 token balances of each token for the given pool
-    token0Contract = token0Contract.attach(token0Address);
-    token1Contract = token1Contract.attach(token1Address);
+    const token0Contract = new ethers.Contract(token0Address, erc20Abi, provider);
+    const token1Contract = new ethers.Contract(token1Address, erc20Abi, provider);
 
     // get amount of eth in the pool if applicable (note if the pool is using WETH, then this value is 0)
-    let poolEthBalance = await provider.getBalance(poolContract.address);
+    const poolEthBalance = await provider.getBalance(poolContract.address);
 
     // get the # amount of each tokens in the liquidity pool
-    let tokenBalance0 = await token0Contract.balanceOf(poolContract.address);
-    let tokenBalance1 = await token1Contract.balanceOf(poolContract.address);
+    const tokenBalance0 = await token0Contract.balanceOf(poolContract.address);
+    const tokenBalance1 = await token1Contract.balanceOf(poolContract.address);
 
     // convert # amount of each tokens in the liquidity pool from ethers BigNumber to BigNumber.js
-    let tokenBalance0BN = new BigNumber(tokenBalance0.toHexString());
-    let tokenBalance1BN = new BigNumber(tokenBalance1.toHexString());
-    let poolEthBalanceBN = new BigNumber(poolEthBalance.toHexString());
+    const tokenBalance0BN = new BigNumber(tokenBalance0.toHexString());
+    const tokenBalance1BN = new BigNumber(tokenBalance1.toHexString());
+    const poolEthBalanceBN = new BigNumber(poolEthBalance.toHexString());
 
     // this returns the token prices in usd of each token (without accounting for decimals)
     let tokenPrices;
@@ -100,7 +89,6 @@ function provideHandleBlock(data) {
       // if coingecko call fails
       return findings;
     }
-    
 
     // multiply the amount of tokens in the pool by usd value, adjusting for decimals
     let token0ValueUSD;
@@ -125,24 +113,23 @@ function provideHandleBlock(data) {
       );
     }
 
-    let stuff = token1ValueUSD + token0ValueUSD
-    console.log(stuff.toString())
-
     // calculate the total liquidity value of the pool at current block
+    // @dev for sanity check, liquidity should be close to the one here for usdc/eth pool https://etherscan.io/address/0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8
     if (token0ValueUSD !== undefined && token1ValueUSD !== undefined) {
       counter === 0
-        ? (previousLiquidity = token0ValueUSD + token1ValueUSD)
-        : (currentLiquidity = token0ValueUSD + token1ValueUSD);
+        ? (previousLiquidity = token0ValueUSD.plus(token1ValueUSD))
+        : (currentLiquidity = token0ValueUSD.plus(token1ValueUSD));
     } else if (token0ValueUSD !== undefined && poolEthBalanceBN.gt(0)) {
       counter === 0
-        ? (previousLiquidity = token0ValueUSD + poolEthBalanceBN)
-        : (currentLiquidity = token0ValueUSD + poolEthBalanceBN);
-    } else if (token1ValueUSD !== undefined && poolEthBalanceBN.get(0)) {
+        ? (previousLiquidity = token0ValueUSD.plus(poolEthBalanceBN))
+        : (currentLiquidity = token0ValueUSD.plus(poolEthBalanceBN));
+    } else if (token1ValueUSD !== undefined && poolEthBalanceBN.gt(0)) {
       counter === 0
-        ? (previousLiquidity = token1ValueUSD + poolEthBalanceBN)
-        : (currentLiquidity = token1ValueUSD + poolEthBalanceBN);
+        ? (previousLiquidity = token1ValueUSD.plus(poolEthBalanceBN))
+        : (currentLiquidity = token1ValueUSD.plus(poolEthBalanceBN));
     }
-    
+
+    // increment counter to signal that the agent has already ran on a previous block before
     counter = 1;
 
     // return no findings the first time this agent is ran
@@ -151,14 +138,28 @@ function provideHandleBlock(data) {
     }
 
     // create findings if currentLiquidity - prevLiquidity > 10%
-    if (
-      (currentLiquidity - previousLiquidity) / previousLiquidity >
-      liquidityThresholdPercentChange
-    ) {
+    let percentChange = currentLiquidity
+      .minus(previousLiquidity)
+      .div(previousLiquidity)
+      .times(100);
+    percentChange = percentChange.absoluteValue();
+
+    if (percentChange.gt(liquidityThresholdPercentChange)) {
       const finding = Finding.fromObject({
         name: "Uniswap V3 Large Change in Liquidity",
-        description: `Large change in liquidity from pool ${poolContract.address}`
-      })
+        description: `Large change in liquidity from pool ${poolContract.address}`,
+        alertId: "AE-UNISWAPV3-LAREGE-LIQUIDITY-CHANGE",
+        severity: FindingSeverity.Info,
+        type: FindingType.Info,
+        everestId,
+        metadata: {
+          address: poolContract.address, // which pool the change in liquidity came from
+          previousLiquidity: previousLiquidity.toString(),
+          currentLiquidity: currentLiquidity.toString(),
+          percentChange,
+        },
+      });
+      findings.push(finding);
     }
     // set previous liquidity value so its accurate the next time this agent runs on the next block
     previousLiquidity = currentLiquidity;

@@ -3,6 +3,6 @@
   "PROTOCOL_NAME": "UNISWAP V3",
   "PROTOCOL_ABBREVIATION": "UNISWAPV3",
   "largeLiquidityChange": {
-    "liquidityThresholdPercentChange": 10
+    "liquidityThresholdPercentChange": "10"
   }
 }
