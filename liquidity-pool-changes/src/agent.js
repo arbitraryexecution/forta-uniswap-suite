@@ -41,8 +41,8 @@ function provideInitialize(data) {
   };
 }
 
-// keep state of liquidity during previous block
-let previousLiquidity;
+let previousLiquidity; // keep state of liquidity during previous block
+let counter = 0; // to instantiate the first previousLiquidity amount the first time this agent is ran
 
 function provideHandleBlock(data) {
   return async function handleBlock(blockEvent) {
@@ -72,14 +72,73 @@ function provideHandleBlock(data) {
     token0Contract = token0Contract.attach(token0Address);
     token1Contract = token1Contract.attach(token1Address);
 
-    let balance = await token0Contract.balanceOf(poolContract.address);
-    // factoryContract.getPool(token0Address, token1Address, )
+    // get amount of eth in the pool if applicable (note if the pool is using WETH, then this value is 0)
+    let poolEthBalance = await provider.getBalance(poolContract.address);
 
-    // get a block and filter it through to test it out
-    let result = await getTokenPrices(token0Address, token1Address);
+    // get the # amount of each tokens in the liquidity pool
+    let tokenBalance0 = await token0Contract.balanceOf(poolContract.address);
+    let tokenBalance1 = await token1Contract.balanceOf(poolContract.address);
 
-    // return findings at the end
-    return findings
+    // convert # amount of each tokens in the liquidity pool from ethers BigNumber to BigNumber.js
+    let tokenBalance0BN = new BigNumber(tokenBalance0.toHexString());
+    let tokenBalance1BN = new BigNumber(tokenBalance1.toHexString());
+    let poolEthBalanceBN = new BigNumber(poolEthBalance.toHexString());
+
+    // this returns the token prices in usd of each token (without accounting for decimals)
+    let tokenPrices = await getTokenPrices(token0Address, token1Address);
+
+    // multiply the amount of tokens in the pool by usd value, adjusting for decimals
+    let token0ValueUSD;
+    let token1ValueUSD;
+    let currentLiquidity;
+
+    if (tokenBalance0BN.gt(0)) {
+      token0ValueUSD = await getTokenUSDValue(
+        tokenBalance0BN,
+        tokenPrices.token0Price,
+        token0Address,
+        provider
+      );
+    }
+
+    if (tokenBalance1BN.gt(0)) {
+      token1ValueUSD = await getTokenUSDValue(
+        tokenBalance1BN,
+        tokenPrices.token1Price,
+        token1Address,
+        provider
+      );
+    }
+
+    // calculate the total liquidity value of the pool at current block
+    if (token0ValueUSD !== undefined && token1ValueUSD !== undefined) {
+      counter === 0
+        ? (previousLiquidity = token0ValueUSD.times(token1ValueUSD))
+        : (currentLiquidity = token0ValueUSD.times(token1ValueUSD));
+    } else if (token0ValueUSD !== undefined && poolEthBalanceBN.gt(0)) {
+      counter === 0
+        ? (previousLiquidity = token0ValueUSD.times(poolEthBalanceBN))
+        : (currentLiquidity = token0ValueUSD.times(poolEthBalanceBN));
+    } else if (token1ValueUSD !== undefined && poolEthBalanceBN.get(0)) {
+      counter === 0
+        ? (previousLiquidity = token1ValueUSD.times(poolEthBalanceBN))
+        : (currentLiquidity = token1ValueUSD.times(poolEthBalanceBN));
+    }
+
+    counter = 1;
+
+    // return no findings the first time this agent is ran
+    if (currentLiquidity === undefined) {
+      return findings;
+    }
+
+    // create findings if currentLiquidity - prevLiquidity > 10%
+
+
+    // set previous liquidity value so its accurate the next time this agent runs on the next block
+    previousLiquidity = currentLiquidity
+
+    return findings;
   };
 }
 
@@ -99,7 +158,8 @@ async function getTokenPrices(token0Address, token1Address) {
   return { token0Price: usdPerToken0, token1Price: usdPerToken1 };
 }
 
-async function getSwapTokenUSDValue() {
+// amountBN is the amount of tokens in the liquidity pool in BigNumber.js format
+async function getTokenUSDValue(amountBN, tokenPrice, tokenAddress, provider) {
   // get the decimal scaling for this token
   const contract = new ethers.Contract(tokenAddress, DECIMALS_ABI, provider);
   let decimals;
@@ -114,9 +174,6 @@ async function getSwapTokenUSDValue() {
   // multiply by the price and divide out decimal places
   return amountBN.times(tokenPrice).div(denominator);
 }
-
-// helper function to create alerts
-function createAlert() {}
 
 module.exports = {
   provideInitialize,
