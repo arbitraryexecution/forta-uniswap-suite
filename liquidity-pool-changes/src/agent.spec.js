@@ -7,7 +7,7 @@ const mockPoolAddress = "0xFAKEPOOLADDRESS"; // .address
 const mockToken0Amount = 10; // token0.balanceOf()
 const mockToken1Amount = 20; // token1.balanceOf()
 const mockPoolBalance = 2;
-const mockDecimals = 0;
+const mockDecimals = 3;
 
 const mockPoolContract = {
   token0: jest.fn().mockResolvedValue(mockToken0Address),
@@ -93,9 +93,11 @@ describe("large liquidity pool change agent", () => {
 
     it("returns empty findings if liquidity change is below given threshold", async () => {
       // mock a block event that doesn't produce a 10% change in liquidity
-      // mockCoinGeckoResponse.data = {};
-      // mockCoinGeckoResponse.data[mockToken0Address.toLowerCase()] = { usd: usdPricePerTokenNum };
-      // mockCoinGeckoResponse.data[mockToken1Address.toLowerCase()] = { usd: usdPricePerTokenNum };
+
+      // mock coin gecko response data
+      mockCoinGeckoResponse.data = {};
+      mockCoinGeckoResponse.data[mockToken0Address.toLowerCase()] = { usd: 1 };
+      mockCoinGeckoResponse.data[mockToken1Address.toLowerCase()] = { usd: 2000 };
 
       const findings = await handleBlock();
 

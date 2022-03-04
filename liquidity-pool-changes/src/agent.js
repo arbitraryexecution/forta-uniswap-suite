@@ -1,5 +1,5 @@
 const BigNumber = require("bignumber.js"); // always convert ethers.js bignumber to javascript bignumber
-const axios = require("axios").default;
+const axios = require("axios");
 
 const {
   Finding,
@@ -85,10 +85,9 @@ function provideHandleBlock(data) {
     let tokenPrices;
     try {
       tokenPrices = await getTokenPrices(token0Address, token1Address);
-      console.log("good")
-    } catch {
+    } catch (error) {
       // if coingecko call fails
-      console.log("failed")
+      console.log("coingecko error:", error)
       return findings;
     }
 
