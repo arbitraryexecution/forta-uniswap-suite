@@ -41,7 +41,7 @@ let previousLiquidity; // keep state of liquidity during previous block
 let counter = 0; // to instantiate the first previousLiquidity amount the first time this agent is ran
 
 function provideHandleBlock(data) {
-  return async function handleBlock(blockEvent) {
+  return async function handleBlock() {
     const {
       erc20Abi,
       provider,
@@ -77,9 +77,11 @@ function provideHandleBlock(data) {
     const tokenBalance1 = await token1Contract.balanceOf(poolContract.address);
 
     // convert # amount of each tokens in the liquidity pool from ethers BigNumber to BigNumber.js
-    const tokenBalance0BN = new BigNumber(tokenBalance0.toHexString());
-    const tokenBalance1BN = new BigNumber(tokenBalance1.toHexString());
-    const poolEthBalanceBN = new BigNumber(poolEthBalance.toHexString());
+    const tokenBalance0BN = new BigNumber(tokenBalance0.toString());
+    const tokenBalance1BN = new BigNumber(tokenBalance1.toString());
+    const poolEthBalanceBN = new BigNumber(poolEthBalance.toString());
+
+    console.log(tokenBalance0BN)
 
     // this returns the token prices in usd of each token (without accounting for decimals)
     let tokenPrices;
@@ -153,7 +155,7 @@ function provideHandleBlock(data) {
         type: FindingType.Info,
         everestId,
         metadata: {
-          address: poolContract.address, // which pool the change in liquidity came from
+          address: poolContract.address,
           previousLiquidity: previousLiquidity.toString(),
           currentLiquidity: currentLiquidity.toString(),
           percentChange,
