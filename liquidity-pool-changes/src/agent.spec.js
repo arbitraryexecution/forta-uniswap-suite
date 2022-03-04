@@ -3,19 +3,20 @@ const BigNumber = require("bignumber.js");
 // pool mocking
 const mockToken0Address = "0xFAKETOKEN0ADDRESS"; // .token0()
 const mockToken1Address = "0xFAKETOKEN1ADDRESS"; // .token1()
-const mockPoolAddress = "0xFAKEPOOLADDRESS";  // .address
+const mockPoolAddress = "0xFAKEPOOLADDRESS"; // .address
 const mockToken0Amount = 10; // token0.balanceOf()
 const mockToken1Amount = 20; // token1.balanceOf()
 const mockPoolBalance = 2;
 const mockDecimals = 0;
 
 const mockPoolContract = {
-  token0: jest.fn().mockResolvedValue(mockToken0Address), // .tokeno() method that returns back the token address
+  token0: jest.fn().mockResolvedValue(mockToken0Address),
   token1: jest.fn().mockResolvedValue(mockToken1Address),
-  getBalance: jest.fn().mockResolvedValue(mockPoolBalance),
-  balanceOf: jest.fn().mockResolvedValue(mockToken0Amount), // how do we mock token1 amount if both of them use the balanceOf method?
+  balanceOf: jest
+    .fn()
+    .mockReturnValueOnce(mockToken0Amount)
+    .mockReturnValueOnce(mockToken1Amount),
   decimals: jest.fn().mockResolvedValue(mockDecimals),
-  address: jest.fn().mockResolvedValue(mockPoolAddress), 
 };
 
 // combine the mocked provider and contracts into the ethers import mock
@@ -85,16 +86,30 @@ describe("large liquidity pool change agent", () => {
       await provideInitialize(initializeData)();
 
       handleBlock = provideHandleBlock(initializeData);
-      initializeData.provider = {getBalance: jest.fn().mockResolvedValue(mockPoolBalance)}
-
+      initializeData.provider = {
+        getBalance: jest.fn().mockResolvedValue(mockPoolBalance),
+      }; // mock provider
     });
 
     it("returns empty findings if liquidity change is below given threshold", async () => {
       // mock a block event that doesn't produce a 10% change in liquidity
-      console.log(initializeData)
+      // mockCoinGeckoResponse.data = {};
+      // mockCoinGeckoResponse.data[mockToken0Address.toLowerCase()] = { usd: usdPricePerTokenNum };
+      // mockCoinGeckoResponse.data[mockToken1Address.toLowerCase()] = { usd: usdPricePerTokenNum };
 
-      await handleBlock()
+      const findings = await handleBlock();
 
+      expect(findings).toStrictEqual([]);
+      expect(mockPoolContract.token0).toHaveBeenCalledTimes(1);
+      expect(mockPoolContract.token1).toHaveBeenCalledTimes(1);
+      expect(mockPoolContract.balanceOf).toHaveBeenCalledTimes(2);
+      expect(initializeData.provider.getBalance).toHaveBeenCalledTimes(1);
+      expect(axios.get).toHaveBeenCalledTimes(1)
+
+      mockPoolContract.token0.mockClear();
+      mockPoolContract.token1.mockClear();
+      mockPoolContract.balanceOf.mockClear();
+      initializeData.provider.getBalance.mockClear();
     });
 
     it("returns a finding if liquidity change in above the given threshold", async () => {

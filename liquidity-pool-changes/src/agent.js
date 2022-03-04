@@ -81,14 +81,14 @@ function provideHandleBlock(data) {
     const tokenBalance1BN = new BigNumber(tokenBalance1.toString());
     const poolEthBalanceBN = new BigNumber(poolEthBalance.toString());
 
-    console.log(tokenBalance0BN)
-
     // this returns the token prices in usd of each token (without accounting for decimals)
     let tokenPrices;
     try {
       tokenPrices = await getTokenPrices(token0Address, token1Address);
+      console.log("good")
     } catch {
       // if coingecko call fails
+      console.log("failed")
       return findings;
     }
 
