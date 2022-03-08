@@ -1,9 +1,7 @@
-const BigNumber = require("bignumber.js");
-
 // pool mocking
-const mockToken0Address = "0xFAKETOKEN0ADDRESS"; // .token0()
-const mockToken1Address = "0xFAKETOKEN1ADDRESS"; // .token1()
-const mockPoolAddress = "0xFAKEPOOLADDRESS"; // .address
+const mockToken0Address = '0xFAKETOKEN0ADDRESS'; // .token0()
+const mockToken1Address = '0xFAKETOKEN1ADDRESS'; // .token1()
+const mockPoolAddress = '0xFAKEPOOLADDRESS'; // .address
 const mockToken0Amount = 10000; // token0.balanceOf()
 const mockToken1Amount = 5; // token1.balanceOf()
 const mockToken0Amount2 = 20000; // token0.balanceOf() to produce a large liquidity change
@@ -29,11 +27,11 @@ const mockPoolContract = {
 };
 
 // combine the mocked provider and contracts into the ethers import mock
-jest.mock("forta-agent", () => ({
-  ...jest.requireActual("forta-agent"),
+jest.mock('forta-agent', () => ({
+  ...jest.requireActual('forta-agent'),
   getEthersProvider: jest.fn(),
   ethers: {
-    ...jest.requireActual("ethers"),
+    ...jest.requireActual('ethers'),
     providers: {
       JsonRpcBatchProvider: jest.fn(),
     },
@@ -45,7 +43,7 @@ const {
   FindingType,
   FindingSeverity,
   Finding,
-} = require("forta-agent");
+} = require('forta-agent');
 
 // axios mocking
 const mockCoinGeckoData = {};
@@ -53,29 +51,27 @@ const mockCoinGeckoResponse = {
   data: mockCoinGeckoData,
 };
 
-jest.mock("axios", () => ({
+jest.mock('axios', () => ({
   get: jest.fn().mockResolvedValue(mockCoinGeckoResponse),
 }));
 
-const axios = require("axios");
+const axios = require('axios');
 
-const utils = require("./utils");
-
-const config = require("../agent-config.json");
+const config = require('../agent-config.json');
 
 const {
   provideHandleBlock,
   provideInitialize,
   getPreviousLiquidity,
-} = require("./agent");
+} = require('./agent');
 
 // axios mock test
-describe("mock axios GET requests", () => {
-  it("should call axios.get and return the mocked response for CoinGecko", async () => {
-    mockCoinGeckoResponse.data = { "0xtokenaddress": { usd: 1000 } };
-    const response = await axios.get("https://url.url");
+describe('mock axios GET requests', () => {
+  it('should call axios.get and return the mocked response for CoinGecko', async () => {
+    mockCoinGeckoResponse.data = { '0xtokenaddress': { usd: 1000 } };
+    const response = await axios.get('https://url.url');
     expect(axios.get).toHaveBeenCalledTimes(1);
-    expect(response.data["0xtokenaddress"].usd).toEqual(1000);
+    expect(response.data['0xtokenaddress'].usd).toEqual(1000);
 
     // reset call count for next test
     axios.get.mockClear();
@@ -84,12 +80,10 @@ describe("mock axios GET requests", () => {
 });
 
 // handler tests
-describe("large liquidity pool change agent", () => {
-  describe("handleBlock", () => {
+describe('large liquidity pool change agent', () => {
+  describe('handleBlock', () => {
     let initializeData;
     let handleBlock;
-
-    // create a block event that changes liquiidty
 
     beforeEach(async () => {
       initializeData = {};
@@ -102,7 +96,7 @@ describe("large liquidity pool change agent", () => {
       }; // mock provider
     });
 
-    it("returns empty findings if liquidity change is below given threshold", async () => {
+    it('returns empty findings if liquidity change is below given threshold', async () => {
       // mock coin gecko response data
       mockCoinGeckoResponse.data = {};
       mockCoinGeckoResponse.data[mockToken0Address.toLowerCase()] = { usd: 1 };
@@ -110,7 +104,6 @@ describe("large liquidity pool change agent", () => {
         usd: 2000,
       };
 
-      // run handleBlock() once to set previous liquidity value for the first time
       const findings = await handleBlock();
 
       expect(findings).toStrictEqual([]);
@@ -127,7 +120,7 @@ describe("large liquidity pool change agent", () => {
       initializeData.provider.getBalance.mockClear();
     });
 
-    it("returns a finding if liquidity change is above the given threshold", async () => {
+    it('returns a finding if liquidity change is above the given threshold', async () => {
       // mock coin gecko response data
       mockCoinGeckoResponse.data = {};
       mockCoinGeckoResponse.data[mockToken0Address.toLowerCase()] = { usd: 1 };
@@ -135,24 +128,24 @@ describe("large liquidity pool change agent", () => {
         usd: 2000,
       };
 
-      // run handleBlock() once to set previous liquidity value for the first time - should be no findings
+      // run handleBlock() to set previous liquidity value for the first time. Should be no findings
       const findings0 = await handleBlock();
-      expect(findings0).toStrictEqual([])
+      expect(findings0).toStrictEqual([]);
 
-      let prevLiquidity = getPreviousLiquidity();
+      const prevLiquidity = getPreviousLiquidity();
 
+      // run again and the agent should pick up on the changes of liquidity
       const findings = await handleBlock();
 
-      let currentLiquidity = getPreviousLiquidity();
+      const currentLiquidity = getPreviousLiquidity();
 
-      let percentChange =
-        ((currentLiquidity - prevLiquidity) / prevLiquidity) * 100;
+      const percentChange = ((currentLiquidity - prevLiquidity) / prevLiquidity) * 100;
 
       const expectedFindings = [
         Finding.fromObject({
-          name: "Uniswap V3 Large Change in Liquidity",
+          name: 'Uniswap V3 Large Change in Liquidity',
           description: `Large change in liquidity from pool ${mockPoolAddress}`,
-          alertId: "AE-UNISWAPV3-LAREGE-LIQUIDITY-CHANGE",
+          alertId: 'AE-UNISWAPV3-LAREGE-LIQUIDITY-CHANGE',
           severity: FindingSeverity.Info,
           type: FindingType.Info,
           everestId: config.EVEREST_ID,

@@ -1,8 +1,9 @@
-const { ethers } = require("forta-agent");
+const { ethers } = require('forta-agent');
 
-const contractAddresses = require("../contract-addresses.json");
+const contractAddresses = require('../contract-addresses.json');
 
 function getAbi(abiFile) {
+  // eslint-disable-next-line global-require,import/no-dynamic-require
   const { abi } = require(`../abi/${abiFile}`);
   return abi;
 }
