@@ -75,7 +75,7 @@ function provideHandleBlock(data) {
     // get the # amount of each tokens in the liquidity pool
     const tokenBalance0 = await token0Contract.balanceOf(poolContract.address);
     const tokenBalance1 = await token1Contract.balanceOf(poolContract.address);
-
+  
     // convert # amount of each tokens in the liquidity pool from ethers BigNumber to BigNumber.js
     const tokenBalance0BN = new BigNumber(tokenBalance0.toString());
     const tokenBalance1BN = new BigNumber(tokenBalance1.toString());
@@ -129,7 +129,7 @@ function provideHandleBlock(data) {
         ? (previousLiquidity = token1ValueUSD.plus(poolEthBalanceBN))
         : (currentLiquidity = token1ValueUSD.plus(poolEthBalanceBN));
     }
-
+    
     // increment counter to signal that the agent has already ran on a previous block before
     counter = 1;
 
@@ -157,7 +157,7 @@ function provideHandleBlock(data) {
           address: poolContract.address,
           previousLiquidity: previousLiquidity.toString(),
           currentLiquidity: currentLiquidity.toString(),
-          percentChange,
+          percentChange: percentChange.toString(),
         },
       });
       findings.push(finding);
@@ -202,9 +202,15 @@ async function getTokenUSDValue(amountBN, tokenPrice, tokenAddress, provider) {
   return amountBN.times(tokenPrice).div(denominator);
 }
 
+// for testing purposes
+function getPreviousLiquidity() {
+  return previousLiquidity
+}
+
 module.exports = {
   provideInitialize,
   initialize: provideInitialize(initializeData),
   provideHandleBlock,
   handleBlock: provideHandleBlock(initializeData),
+  getPreviousLiquidity
 };
