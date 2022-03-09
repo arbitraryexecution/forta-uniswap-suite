@@ -17,14 +17,11 @@ const utils = require('./utils');
 const DECIMALS_ABI = ['function decimals() view returns (uint8)'];
 
 // used to store initialization data once you pass it into the provideHandleBlock() function
-
 const initializeData = {};
 
 function provideInitialize(data) {
   return async function initialize() {
     /* eslint-disable no-param-reassign */
-    data.everestId = config.EVEREST_ID;
-
     // setup ethers.js provider to interact with contracts
     data.provider = getEthersProvider();
 
@@ -33,7 +30,7 @@ function provideInitialize(data) {
 
     // get liquidityThresholdPercentChange
     data.liquidityThresholdPercentChange = new BigNumber(
-      config.largeLiquidityChange.liquidityThresholdPercentChange,
+      config.liquidityThresholdPercentChange,
     );
     /* eslint-disable no-param-reassign */
   };
@@ -77,7 +74,7 @@ let counter = 0; // instantiate previousLiquidity amount the first time this age
 function provideHandleBlock(data) {
   return async function handleBlock() {
     const {
-      erc20Abi, provider, everestId, liquidityThresholdPercentChange,
+      erc20Abi, provider, liquidityThresholdPercentChange,
     } = data;
 
     // make sure that data is initialized first
@@ -192,7 +189,6 @@ function provideHandleBlock(data) {
         alertId: 'AE-UNISWAPV3-LAREGE-LIQUIDITY-CHANGE',
         severity: FindingSeverity.Info,
         type: FindingType.Info,
-        everestId,
         metadata: {
           address: poolContract.address,
           previousLiquidity: previousLiquidity.toString(),

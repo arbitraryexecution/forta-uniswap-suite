@@ -57,8 +57,6 @@ jest.mock('axios', () => ({
 
 const axios = require('axios');
 
-const config = require('../agent-config.json');
-
 const {
   provideHandleBlock,
   provideInitialize,
@@ -148,7 +146,6 @@ describe('large liquidity pool change agent', () => {
           alertId: 'AE-UNISWAPV3-LAREGE-LIQUIDITY-CHANGE',
           severity: FindingSeverity.Info,
           type: FindingType.Info,
-          everestId: config.EVEREST_ID,
           metadata: {
             address: mockPoolAddress,
             previousLiquidity: prevLiquidity.toString(),
