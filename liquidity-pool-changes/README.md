@@ -2,7 +2,7 @@
 
 ## Description
 
-This agent detects changes in liquidity pools when there is a change greater than 10%
+This agent detects changes in liquidity pools when there is a change greater than 10%.
 
 ## Alerts
 

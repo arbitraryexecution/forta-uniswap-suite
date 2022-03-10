@@ -1,3 +1,5 @@
+const BigNumber = require('bignumber.js');
+
 // pool mocking
 const mockToken0Address = '0xFAKETOKEN0ADDRESS'; // .token0()
 const mockToken1Address = '0xFAKETOKEN1ADDRESS'; // .token1()
@@ -60,7 +62,6 @@ const axios = require('axios');
 const {
   provideHandleBlock,
   provideInitialize,
-  getPreviousLiquidity,
 } = require('./agent');
 
 // axios mock test
@@ -89,9 +90,6 @@ describe('large liquidity pool change agent', () => {
       await provideInitialize(initializeData)();
 
       handleBlock = provideHandleBlock(initializeData);
-      initializeData.provider = {
-        getBalance: jest.fn().mockResolvedValue(mockPoolBalance),
-      }; // mock provider
     });
 
     it('returns empty findings if liquidity change is below given threshold', async () => {
@@ -102,20 +100,20 @@ describe('large liquidity pool change agent', () => {
         usd: 2000,
       };
 
+      initializeData.liquidityThresholdPercentChange = new BigNumber(10);
+
       const findings = await handleBlock();
 
       expect(findings).toStrictEqual([]);
       expect(mockPoolContract.token0).toHaveBeenCalledTimes(1);
       expect(mockPoolContract.token1).toHaveBeenCalledTimes(1);
       expect(mockPoolContract.balanceOf).toHaveBeenCalledTimes(2);
-      expect(initializeData.provider.getBalance).toHaveBeenCalledTimes(1);
       expect(axios.get).toHaveBeenCalledTimes(1);
 
       axios.get.mockClear();
       mockPoolContract.token0.mockClear();
       mockPoolContract.token1.mockClear();
       mockPoolContract.balanceOf.mockClear();
-      initializeData.provider.getBalance.mockClear();
     });
 
     it('returns a finding if liquidity change is above the given threshold', async () => {
@@ -126,16 +124,19 @@ describe('large liquidity pool change agent', () => {
         usd: 2000,
       };
 
+      // set threshold percent so it doesn't rely on the config file
+      initializeData.liquidityThresholdPercentChange = new BigNumber(10);
+
       // run handleBlock() to set previous liquidity value for the first time. Should be no findings
       const findings0 = await handleBlock();
       expect(findings0).toStrictEqual([]);
 
-      const prevLiquidity = getPreviousLiquidity();
+      const prevLiquidity = initializeData.previousLiquidity;
 
       // run again and the agent should pick up on the changes of liquidity
       const findings = await handleBlock();
 
-      const currentLiquidity = getPreviousLiquidity();
+      const currentLiquidity = initializeData.previousLiquidity;
 
       const percentChange = ((currentLiquidity - prevLiquidity) / prevLiquidity) * 100;
 
@@ -143,7 +144,7 @@ describe('large liquidity pool change agent', () => {
         Finding.fromObject({
           name: 'Uniswap V3 Large Change in Liquidity',
           description: `Large change in liquidity from pool ${mockPoolAddress}`,
-          alertId: 'AE-UNISWAPV3-LAREGE-LIQUIDITY-CHANGE',
+          alertId: 'AE-UNISWAPV3-LARGE-LIQUIDITY-CHANGE',
           severity: FindingSeverity.Info,
           type: FindingType.Info,
           metadata: {
@@ -159,13 +160,11 @@ describe('large liquidity pool change agent', () => {
       expect(mockPoolContract.token0).toHaveBeenCalledTimes(2);
       expect(mockPoolContract.token1).toHaveBeenCalledTimes(2);
       expect(mockPoolContract.balanceOf).toHaveBeenCalledTimes(4);
-      expect(initializeData.provider.getBalance).toHaveBeenCalledTimes(2);
       expect(axios.get).toHaveBeenCalledTimes(2);
 
       mockPoolContract.token0.mockClear();
       mockPoolContract.token1.mockClear();
       mockPoolContract.balanceOf.mockClear();
-      initializeData.provider.getBalance.mockClear();
     });
   });
 });

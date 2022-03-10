@@ -14,8 +14,6 @@ const config = require('../agent-config.json');
 
 const utils = require('./utils');
 
-const DECIMALS_ABI = ['function decimals() view returns (uint8)'];
-
 // used to store initialization data once you pass it into the provideHandleBlock() function
 const initializeData = {};
 
@@ -32,6 +30,9 @@ function provideInitialize(data) {
     data.liquidityThresholdPercentChange = new BigNumber(
       config.liquidityThresholdPercentChange,
     );
+
+    // initalize previousLiquidity to undefined
+    data.previousLiquidity = undefined;
     /* eslint-disable no-param-reassign */
   };
 }
@@ -41,7 +42,7 @@ async function getTokenPrices(token0Address, token1Address) {
   const addressQuery = `contract_addresses=${token0Address},${token1Address}`;
   const vsCurrency = '&vs_currencies=usd';
 
-  const url = coingeckoApiUrl.concat(addressQuery.concat(vsCurrency));
+  const url = coingeckoApiUrl + addressQuery + vsCurrency;
   const { data } = await axios.get(url);
 
   // parse response to convert to BigNumber.js
@@ -52,13 +53,11 @@ async function getTokenPrices(token0Address, token1Address) {
 }
 
 // amountBN is the amount of tokens in the liquidity pool in BigNumber.js format
-async function getTokenUSDValue(amountBN, tokenPrice, tokenAddress, provider) {
+async function getTokenUSDValue(amountBN, tokenPrice, tokenContract) {
   // get the decimal scaling for this token
-  const contract = new ethers.Contract(tokenAddress, DECIMALS_ABI, provider);
   let decimals;
   try {
-    // calling .decimals() may fail for a vyper contract
-    decimals = await contract.decimals();
+    decimals = await tokenContract.decimals();
   } catch {
     return undefined;
   }
@@ -68,17 +67,12 @@ async function getTokenUSDValue(amountBN, tokenPrice, tokenAddress, provider) {
   return amountBN.times(tokenPrice).div(denominator);
 }
 
-let previousLiquidity; // keep state of liquidity during previous block
-let counter = 0; // instantiate previousLiquidity amount the first time this agent is ran
-
 function provideHandleBlock(data) {
   return async function handleBlock() {
-    const {
-      erc20Abi, provider, liquidityThresholdPercentChange,
-    } = data;
+    const { erc20Abi, provider, liquidityThresholdPercentChange } = data;
 
     // make sure that data is initialized first
-    if (!provider) throw new Error('handleBlock called before initialization');
+    if (!liquidityThresholdPercentChange) throw new Error('handleBlock called before initialization');
 
     const findings = [];
 
@@ -91,7 +85,7 @@ function provideHandleBlock(data) {
       token1Address = await poolContract.token1();
     } catch {
       // asume its not a Uniswap V3 pool if contract calls fail
-      return undefined;
+      return findings;
     }
 
     const token0Contract = new ethers.Contract(
@@ -105,9 +99,6 @@ function provideHandleBlock(data) {
       provider,
     );
 
-    // get amount of eth in the pool if applicable (if the pool is using WETH, then this value is 0)
-    const poolEthBalance = await provider.getBalance(poolContract.address);
-
     // get the # amount of each tokens in the liquidity pool
     const tokenBalance0 = await token0Contract.balanceOf(poolContract.address);
     const tokenBalance1 = await token1Contract.balanceOf(poolContract.address);
@@ -115,7 +106,6 @@ function provideHandleBlock(data) {
     // convert # amount of each tokens in the liquidity pool from ethers BigNumber to BigNumber.js
     const tokenBalance0BN = new BigNumber(tokenBalance0.toString());
     const tokenBalance1BN = new BigNumber(tokenBalance1.toString());
-    const poolEthBalanceBN = new BigNumber(poolEthBalance.toString());
 
     // this returns the token prices in usd of each token (without accounting for decimals)
     let tokenPrices;
@@ -135,8 +125,7 @@ function provideHandleBlock(data) {
       token0ValueUSD = await getTokenUSDValue(
         tokenBalance0BN,
         tokenPrices.token0Price,
-        token0Address,
-        provider,
+        token0Contract,
       );
     }
 
@@ -144,41 +133,35 @@ function provideHandleBlock(data) {
       token1ValueUSD = await getTokenUSDValue(
         tokenBalance1BN,
         tokenPrices.token1Price,
-        token1Address,
-        provider,
+        token1Contract,
       );
     }
 
     // calculate the total liquidity value of the pool at current block
     // @dev for sanity check, liquidity should be close to the one here for usdc/eth pool https://etherscan.io/address/0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8
-    /* eslint no-unused-expressions: ["error", {"allowTernary": true }] */
-    if (token0ValueUSD !== undefined && token1ValueUSD !== undefined) {
-      counter === 0
-        ? (previousLiquidity = token0ValueUSD.plus(token1ValueUSD))
-        : (currentLiquidity = token0ValueUSD.plus(token1ValueUSD));
-    } else if (token0ValueUSD !== undefined && poolEthBalanceBN.gt(0)) {
-      counter === 0
-        ? (previousLiquidity = token0ValueUSD.plus(poolEthBalanceBN))
-        : (currentLiquidity = token0ValueUSD.plus(poolEthBalanceBN));
-    } else if (token1ValueUSD !== undefined && poolEthBalanceBN.gt(0)) {
-      counter === 0
-        ? (previousLiquidity = token1ValueUSD.plus(poolEthBalanceBN))
-        : (currentLiquidity = token1ValueUSD.plus(poolEthBalanceBN));
+    if (token0ValueUSD === undefined) {
+      token0ValueUSD = new BigNumber(0);
     }
-    /* eslint no-unused-expressions: ["error", { "allowTernary": true }] */
 
-    // increment counter to signal that the agent has already ran on a previous block before
-    counter = 1;
+    if (token1ValueUSD === undefined) {
+      token1ValueUSD = new BigNumber(0);
+    }
+
+    if (data.previousLiquidity === undefined) {
+      data.previousLiquidity = token0ValueUSD.plus(token1ValueUSD);
+    } else {
+      currentLiquidity = token0ValueUSD.plus(token1ValueUSD);
+    }
 
     // return no findings the first time this agent is ran
     if (currentLiquidity === undefined) {
       return findings;
     }
 
-    // create findings if currentLiquidity - prevLiquidity > 10%
+    // create findings if currentLiquidity - prevLiquidity > min threshold percentage
     let percentChange = currentLiquidity
-      .minus(previousLiquidity)
-      .div(previousLiquidity)
+      .minus(data.previousLiquidity)
+      .div(data.previousLiquidity)
       .times(100);
     percentChange = percentChange.absoluteValue();
 
@@ -186,12 +169,12 @@ function provideHandleBlock(data) {
       const finding = Finding.fromObject({
         name: 'Uniswap V3 Large Change in Liquidity',
         description: `Large change in liquidity from pool ${poolContract.address}`,
-        alertId: 'AE-UNISWAPV3-LAREGE-LIQUIDITY-CHANGE',
+        alertId: 'AE-UNISWAPV3-LARGE-LIQUIDITY-CHANGE',
         severity: FindingSeverity.Info,
         type: FindingType.Info,
         metadata: {
           address: poolContract.address,
-          previousLiquidity: previousLiquidity.toString(),
+          previousLiquidity: data.previousLiquidity.toString(),
           currentLiquidity: currentLiquidity.toString(),
           percentChange: percentChange.toString(),
         },
@@ -199,15 +182,10 @@ function provideHandleBlock(data) {
       findings.push(finding);
     }
     // set previous liquidity value so its accurate the next time this agent runs on the next block
-    previousLiquidity = currentLiquidity;
+    data.previousLiquidity = currentLiquidity;
 
     return findings;
   };
-}
-
-// for testing purposes
-function getPreviousLiquidity() {
-  return previousLiquidity;
 }
 
 module.exports = {
@@ -215,5 +193,4 @@ module.exports = {
   initialize: provideInitialize(initializeData),
   provideHandleBlock,
   handleBlock: provideHandleBlock(initializeData),
-  getPreviousLiquidity,
 };
