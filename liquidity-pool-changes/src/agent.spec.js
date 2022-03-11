@@ -4,26 +4,12 @@ const BigNumber = require('bignumber.js');
 const mockToken0Address = '0xFAKETOKEN0ADDRESS'; // .token0()
 const mockToken1Address = '0xFAKETOKEN1ADDRESS'; // .token1()
 const mockPoolAddress = '0xFAKEPOOLADDRESS'; // .address
-const mockToken0Amount = 10000; // token0.balanceOf()
-const mockToken1Amount = 5; // token1.balanceOf()
-const mockToken0Amount2 = 20000; // token0.balanceOf() to produce a large liquidity change
-const mockToken1Amount2 = 10; // token1.balanceOf() to produce a large liquidity change
-const mockPoolBalance = 2;
 const mockDecimals = 3;
 
 const mockPoolContract = {
+  // balanceOf gets mocked within each test case for modularity
   token0: jest.fn().mockResolvedValue(mockToken0Address),
   token1: jest.fn().mockResolvedValue(mockToken1Address),
-  balanceOf: jest
-    .fn()
-    // failure test cases
-    .mockReturnValueOnce(mockToken0Amount)
-    .mockReturnValueOnce(mockToken1Amount)
-    // success test cases
-    .mockReturnValueOnce(mockToken0Amount)
-    .mockReturnValueOnce(mockToken1Amount)
-    .mockReturnValueOnce(mockToken0Amount2)
-    .mockReturnValueOnce(mockToken1Amount2),
   decimals: jest.fn().mockResolvedValue(mockDecimals),
   address: mockPoolAddress,
 };
@@ -41,11 +27,7 @@ jest.mock('forta-agent', () => ({
   },
 }));
 
-const {
-  FindingType,
-  FindingSeverity,
-  Finding,
-} = require('forta-agent');
+const { FindingType, FindingSeverity, Finding } = require('forta-agent');
 
 // axios mocking
 const mockCoinGeckoData = {};
@@ -59,10 +41,7 @@ jest.mock('axios', () => ({
 
 const axios = require('axios');
 
-const {
-  provideHandleBlock,
-  provideInitialize,
-} = require('./agent');
+const { provideHandleBlock, provideInitialize } = require('./agent');
 
 // axios mock test
 describe('mock axios GET requests', () => {
@@ -93,22 +72,69 @@ describe('large liquidity pool change agent', () => {
     });
 
     it('returns empty findings if liquidity change is below given threshold', async () => {
+      const mockToken0Amount = new BigNumber(10);
+      const mockToken1Amount = new BigNumber(5);
+      const mockToken0Amount2 = new BigNumber(10);
+      const mockToken1Amount2 = new BigNumber(5);
+
+      // used to scale response
+      const decimalScaling = (new BigNumber(10)).pow(mockDecimals);
+
       // mock coin gecko response data
       mockCoinGeckoResponse.data = {};
-      mockCoinGeckoResponse.data[mockToken0Address.toLowerCase()] = { usd: 1 };
+      mockCoinGeckoResponse.data[mockToken0Address.toLowerCase()] = { usd: new BigNumber(1) };
       mockCoinGeckoResponse.data[mockToken1Address.toLowerCase()] = {
-        usd: 2000,
+        usd: new BigNumber(2),
       };
 
+      // set threshold percent so it doesn't rely on the config file
       initializeData.liquidityThresholdPercentChange = new BigNumber(10);
 
-      const findings = await handleBlock();
+      // set token amounts so that it doesn't trigger a liquiidty threshold change
+      mockPoolContract.balanceOf = jest
+        .fn()
+        .mockResolvedValueOnce(mockToken0Amount)
+        .mockResolvedValueOnce(mockToken1Amount)
+        .mockResolvedValueOnce(mockToken0Amount2)
+        .mockResolvedValueOnce(mockToken1Amount2);
 
+      // run handleBlock() to set previous liquidity value for the first time. Should be no findings
+      const findings0 = await handleBlock();
+      expect(findings0).toStrictEqual([]);
+
+      // make sure that the liquidity was calculated correctly
+      const prevLiquidity = initializeData.previousLiquidity;
+      const prevLiquidityScaled = prevLiquidity.times(decimalScaling);
+
+      const token0Usd = mockToken0Amount
+        .times(mockCoinGeckoResponse.data[mockToken0Address.toLowerCase()].usd);
+      const token1Usd = mockToken1Amount
+        .times(mockCoinGeckoResponse.data[mockToken1Address.toLowerCase()].usd);
+
+      const expectedPrevLiquidity = token0Usd.plus(token1Usd);
+      expect(prevLiquidityScaled).toEqual(expectedPrevLiquidity);
+
+      // run again
+      // should be no findings because liquidity has not changed above min threshold
+      const findings = await handleBlock();
       expect(findings).toStrictEqual([]);
-      expect(mockPoolContract.token0).toHaveBeenCalledTimes(1);
-      expect(mockPoolContract.token1).toHaveBeenCalledTimes(1);
-      expect(mockPoolContract.balanceOf).toHaveBeenCalledTimes(2);
-      expect(axios.get).toHaveBeenCalledTimes(1);
+
+      // make sure that the liquidity was calculated correctly
+      const currentLiquidity = initializeData.previousLiquidity;
+      const currentLiquidityScaled = currentLiquidity.times(decimalScaling);
+
+      const token0Usd2 = mockToken0Amount2
+        .times(mockCoinGeckoResponse.data[mockToken0Address.toLowerCase()].usd);
+      const token1Usd2 = mockToken1Amount2
+        .times(mockCoinGeckoResponse.data[mockToken1Address.toLowerCase()].usd);
+
+      const expectedCurerentLiquidity = token0Usd2.plus(token1Usd2);
+      expect(currentLiquidityScaled).toEqual(expectedCurerentLiquidity);
+
+      expect(mockPoolContract.token0).toHaveBeenCalledTimes(2);
+      expect(mockPoolContract.token1).toHaveBeenCalledTimes(2);
+      expect(mockPoolContract.balanceOf).toHaveBeenCalledTimes(4);
+      expect(axios.get).toHaveBeenCalledTimes(2);
 
       axios.get.mockClear();
       mockPoolContract.token0.mockClear();
@@ -117,28 +143,69 @@ describe('large liquidity pool change agent', () => {
     });
 
     it('returns a finding if liquidity change is above the given threshold', async () => {
+      const mockToken0Amount = new BigNumber(10);
+      const mockToken1Amount = new BigNumber(5);
+      const mockToken0Amount2 = new BigNumber(20);
+      const mockToken1Amount2 = new BigNumber(10);
+
+      // scale response
+      const decimalScaling = (new BigNumber(10)).pow(mockDecimals);
+
       // mock coin gecko response data
       mockCoinGeckoResponse.data = {};
-      mockCoinGeckoResponse.data[mockToken0Address.toLowerCase()] = { usd: 1 };
+      mockCoinGeckoResponse.data[mockToken0Address.toLowerCase()] = { usd: new BigNumber(1) };
       mockCoinGeckoResponse.data[mockToken1Address.toLowerCase()] = {
-        usd: 2000,
+        usd: new BigNumber(2),
       };
 
       // set threshold percent so it doesn't rely on the config file
       initializeData.liquidityThresholdPercentChange = new BigNumber(10);
 
+      // set token amounts so that is does trigger a liquidity threshold change
+      mockPoolContract.balanceOf = jest
+        .fn()
+        .mockResolvedValueOnce(mockToken0Amount)
+        .mockResolvedValueOnce(mockToken1Amount)
+        .mockResolvedValueOnce(mockToken0Amount2)
+        .mockResolvedValueOnce(mockToken1Amount2);
+
       // run handleBlock() to set previous liquidity value for the first time. Should be no findings
       const findings0 = await handleBlock();
       expect(findings0).toStrictEqual([]);
 
+      // make sure that liquidity was calculated correctly
       const prevLiquidity = initializeData.previousLiquidity;
+      const prevLiquidityScaled = prevLiquidity.times(decimalScaling);
 
-      // run again and the agent should pick up on the changes of liquidity
+      const token0Usd = mockToken0Amount
+        .times(mockCoinGeckoResponse.data[mockToken0Address.toLowerCase()].usd);
+      const token1Usd = mockToken1Amount
+        .times(mockCoinGeckoResponse.data[mockToken1Address.toLowerCase()].usd);
+
+      const expectedPrevLiquidity = token0Usd.plus(token1Usd);
+      expect(prevLiquidityScaled).toEqual(expectedPrevLiquidity);
+
+      // run again
+      // agent should pick up on finding because liquidity changed above min threshold
       const findings = await handleBlock();
 
+      // make sure that liquidity was calculated correctly
       const currentLiquidity = initializeData.previousLiquidity;
+      const currentLiquidityScaled = currentLiquidity.times(decimalScaling);
 
-      const percentChange = ((currentLiquidity - prevLiquidity) / prevLiquidity) * 100;
+      const token0Usd2 = mockToken0Amount2
+        .times(mockCoinGeckoResponse.data[mockToken0Address.toLowerCase()].usd);
+      const token1Usd2 = mockToken1Amount2
+        .times(mockCoinGeckoResponse.data[mockToken1Address.toLowerCase()].usd);
+
+      const expectedCurrentLiquidity = token0Usd2.plus(token1Usd2);
+      expect(currentLiquidityScaled).toEqual(expectedCurrentLiquidity);
+
+      let percentChange = currentLiquidity
+        .minus(prevLiquidity)
+        .div(prevLiquidity)
+        .times(100);
+      percentChange = percentChange.absoluteValue();
 
       const expectedFindings = [
         Finding.fromObject({

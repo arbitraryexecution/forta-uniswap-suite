@@ -1,4 +1,4 @@
-const BigNumber = require('bignumber.js'); // always convert ethers.js bignumber to javascript bignumber
+const BigNumber = require('bignumber.js');
 const axios = require('axios');
 
 const {
@@ -138,7 +138,6 @@ function provideHandleBlock(data) {
     }
 
     // calculate the total liquidity value of the pool at current block
-    // @dev for sanity check, liquidity should be close to the one here for usdc/eth pool https://etherscan.io/address/0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8
     if (token0ValueUSD === undefined) {
       token0ValueUSD = new BigNumber(0);
     }
@@ -147,14 +146,12 @@ function provideHandleBlock(data) {
       token1ValueUSD = new BigNumber(0);
     }
 
-    if (data.previousLiquidity === undefined) {
-      data.previousLiquidity = token0ValueUSD.plus(token1ValueUSD);
-    } else {
-      currentLiquidity = token0ValueUSD.plus(token1ValueUSD);
-    }
+    // eslint-disable-next-line prefer-const
+    currentLiquidity = token0ValueUSD.plus(token1ValueUSD);
 
-    // return no findings the first time this agent is ran
-    if (currentLiquidity === undefined) {
+    // should only be true the first time this handler is ran
+    if (data.previousLiquidity === undefined) {
+      data.previousLiquidity = currentLiquidity;
       return findings;
     }
 
