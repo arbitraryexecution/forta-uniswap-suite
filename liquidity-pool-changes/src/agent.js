@@ -61,6 +61,7 @@ async function getTokenUSDValue(amountBN, tokenPrice, tokenContract) {
   } catch {
     return undefined;
   }
+  decimals = new BigNumber(decimals); // convert from ether.js bignumber to bignumber.js
   const denominator = new BigNumber(10).pow(decimals);
 
   // multiply by the price and divide out decimal places
@@ -85,7 +86,7 @@ function provideHandleBlock(data) {
       token1Address = await poolContract.token1();
     } catch {
       // asume its not a Uniswap V3 pool if contract calls fail
-      return findings;
+      return [];
     }
 
     const token0Contract = new ethers.Contract(
