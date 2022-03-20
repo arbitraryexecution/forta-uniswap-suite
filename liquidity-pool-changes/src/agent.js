@@ -61,7 +61,7 @@ async function getTokenUSDValue(amountBN, tokenPrice, tokenContract) {
   } catch {
     return undefined;
   }
-  decimals = new BigNumber(decimals); // convert from ether.js bignumber to bignumber.js
+  decimals = new BigNumber(decimals.toString()); // convert from ether.js BigNumber to BigNumber.js
   const denominator = new BigNumber(10).pow(decimals);
 
   // multiply by the price and divide out decimal places

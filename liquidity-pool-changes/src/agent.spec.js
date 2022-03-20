@@ -24,7 +24,9 @@ jest.mock('forta-agent', () => ({
   },
 }));
 
-const { FindingType, FindingSeverity, Finding } = require('forta-agent');
+const {
+  FindingType, FindingSeverity, Finding, ethers,
+} = require('forta-agent');
 
 // axios mocking
 const mockCoinGeckoData = {};
@@ -69,20 +71,18 @@ describe('large liquidity pool change agent', () => {
     });
 
     it('returns empty findings if liquidity change is below given threshold', async () => {
-      const mockToken0Amount = new BigNumber(10);
-      const mockToken1Amount = new BigNumber(5);
-      const mockToken0Amount2 = new BigNumber(10);
-      const mockToken1Amount2 = new BigNumber(5);
+      const mockToken0Amount = ethers.BigNumber.from('10');
+      const mockToken1Amount = ethers.BigNumber.from('5');
+      const mockToken0Amount2 = ethers.BigNumber.from('10');
+      const mockToken1Amount2 = ethers.BigNumber.from('5');
 
       // used to scale response
       const decimalScaling = (new BigNumber(10)).pow(mockDecimals);
 
       // mock coin gecko response data
       mockCoinGeckoResponse.data = {};
-      mockCoinGeckoResponse.data[mockToken0Address.toLowerCase()] = { usd: new BigNumber(1) };
-      mockCoinGeckoResponse.data[mockToken1Address.toLowerCase()] = {
-        usd: new BigNumber(2),
-      };
+      mockCoinGeckoResponse.data[mockToken0Address.toLowerCase()] = { usd: 1 };
+      mockCoinGeckoResponse.data[mockToken1Address.toLowerCase()] = { usd: 2 };
 
       // set threshold percent so it doesn't rely on the config file
       initializeData.liquidityThresholdPercentChange = new BigNumber(10);
@@ -103,10 +103,14 @@ describe('large liquidity pool change agent', () => {
       const prevLiquidity = initializeData.previousLiquidity;
       const prevLiquidityScaled = prevLiquidity.times(decimalScaling);
 
-      const token0Usd = mockToken0Amount
-        .times(mockCoinGeckoResponse.data[mockToken0Address.toLowerCase()].usd);
-      const token1Usd = mockToken1Amount
-        .times(mockCoinGeckoResponse.data[mockToken1Address.toLowerCase()].usd);
+      // convert from ethers.js Bignumber to Bignumber.js
+      const mockToken0AmountBN = new BigNumber(mockToken0Amount.toString());
+      const mockToken1AmountBN = new BigNumber(mockToken1Amount.toString());
+
+      const token0Usd = mockToken0AmountBN
+        .times(new BigNumber(mockCoinGeckoResponse.data[mockToken0Address.toLowerCase()].usd));
+      const token1Usd = mockToken1AmountBN
+        .times(new BigNumber(mockCoinGeckoResponse.data[mockToken1Address.toLowerCase()].usd));
 
       const expectedPrevLiquidity = token0Usd.plus(token1Usd);
       expect(prevLiquidityScaled).toEqual(expectedPrevLiquidity);
@@ -120,10 +124,14 @@ describe('large liquidity pool change agent', () => {
       const currentLiquidity = initializeData.previousLiquidity;
       const currentLiquidityScaled = currentLiquidity.times(decimalScaling);
 
-      const token0Usd2 = mockToken0Amount2
-        .times(mockCoinGeckoResponse.data[mockToken0Address.toLowerCase()].usd);
-      const token1Usd2 = mockToken1Amount2
-        .times(mockCoinGeckoResponse.data[mockToken1Address.toLowerCase()].usd);
+      // convert from ethers.js Bignumber to Bignumber.js
+      const mockToken0Amount2BN = new BigNumber(mockToken0Amount2.toString());
+      const mockToken1Amount2BN = new BigNumber(mockToken1Amount2.toString());
+
+      const token0Usd2 = mockToken0Amount2BN
+        .times(new BigNumber(mockCoinGeckoResponse.data[mockToken0Address.toLowerCase()].usd));
+      const token1Usd2 = mockToken1Amount2BN
+        .times(new BigNumber(mockCoinGeckoResponse.data[mockToken1Address.toLowerCase()].usd));
 
       const expectedCurerentLiquidity = token0Usd2.plus(token1Usd2);
       expect(currentLiquidityScaled).toEqual(expectedCurerentLiquidity);
@@ -140,20 +148,18 @@ describe('large liquidity pool change agent', () => {
     });
 
     it('returns a finding if liquidity change is above the given threshold', async () => {
-      const mockToken0Amount = new BigNumber(10);
-      const mockToken1Amount = new BigNumber(5);
-      const mockToken0Amount2 = new BigNumber(20);
-      const mockToken1Amount2 = new BigNumber(10);
+      const mockToken0Amount = ethers.BigNumber.from('10');
+      const mockToken1Amount = ethers.BigNumber.from('5');
+      const mockToken0Amount2 = ethers.BigNumber.from('20');
+      const mockToken1Amount2 = ethers.BigNumber.from('10');
 
       // scale response
       const decimalScaling = (new BigNumber(10)).pow(mockDecimals);
 
       // mock coin gecko response data
       mockCoinGeckoResponse.data = {};
-      mockCoinGeckoResponse.data[mockToken0Address.toLowerCase()] = { usd: new BigNumber(1) };
-      mockCoinGeckoResponse.data[mockToken1Address.toLowerCase()] = {
-        usd: new BigNumber(2),
-      };
+      mockCoinGeckoResponse.data[mockToken0Address.toLowerCase()] = { usd: 1 };
+      mockCoinGeckoResponse.data[mockToken1Address.toLowerCase()] = { usd: 2 };
 
       // set threshold percent so it doesn't rely on the config file
       initializeData.liquidityThresholdPercentChange = new BigNumber(10);
@@ -174,10 +180,14 @@ describe('large liquidity pool change agent', () => {
       const prevLiquidity = initializeData.previousLiquidity;
       const prevLiquidityScaled = prevLiquidity.times(decimalScaling);
 
-      const token0Usd = mockToken0Amount
-        .times(mockCoinGeckoResponse.data[mockToken0Address.toLowerCase()].usd);
-      const token1Usd = mockToken1Amount
-        .times(mockCoinGeckoResponse.data[mockToken1Address.toLowerCase()].usd);
+      // convert from ethers.js Bignumber to Bignumber.js
+      const mockToken0AmountBN = new BigNumber(mockToken0Amount.toString());
+      const mockToken1AmountBN = new BigNumber(mockToken1Amount.toString());
+
+      const token0Usd = mockToken0AmountBN
+        .times(new BigNumber(mockCoinGeckoResponse.data[mockToken0Address.toLowerCase()].usd));
+      const token1Usd = mockToken1AmountBN
+        .times(new BigNumber(mockCoinGeckoResponse.data[mockToken1Address.toLowerCase()].usd));
 
       const expectedPrevLiquidity = token0Usd.plus(token1Usd);
       expect(prevLiquidityScaled).toEqual(expectedPrevLiquidity);
@@ -190,10 +200,14 @@ describe('large liquidity pool change agent', () => {
       const currentLiquidity = initializeData.previousLiquidity;
       const currentLiquidityScaled = currentLiquidity.times(decimalScaling);
 
-      const token0Usd2 = mockToken0Amount2
-        .times(mockCoinGeckoResponse.data[mockToken0Address.toLowerCase()].usd);
-      const token1Usd2 = mockToken1Amount2
-        .times(mockCoinGeckoResponse.data[mockToken1Address.toLowerCase()].usd);
+      // convert from ethers.js Bignumber to Bignumber.js
+      const mockToken0Amount2BN = new BigNumber(mockToken0Amount2.toString());
+      const mockToken1Amount2BN = new BigNumber(mockToken1Amount2.toString());
+
+      const token0Usd2 = mockToken0Amount2BN
+        .times(new BigNumber(mockCoinGeckoResponse.data[mockToken0Address.toLowerCase()].usd));
+      const token1Usd2 = mockToken1Amount2BN
+        .times(new BigNumber(mockCoinGeckoResponse.data[mockToken1Address.toLowerCase()].usd));
 
       const expectedCurrentLiquidity = token0Usd2.plus(token1Usd2);
       expect(currentLiquidityScaled).toEqual(expectedCurrentLiquidity);
