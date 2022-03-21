@@ -10,6 +10,7 @@ the following handlers:
  - admin-events
  - address-watch
  - large-flash-swap
+ - liquidity-pool-changes
 
 ## Supported Chains
 
